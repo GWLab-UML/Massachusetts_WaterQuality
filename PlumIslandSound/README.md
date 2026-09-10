@@ -23,9 +23,9 @@ GPS coordinates: 42.75112° N, 70.83723° W
 
 *last download: 08/11/2026*
 
-- [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/MudcreekWild_pH.csv)
-- [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/MudcreekWild_salinity_DO.csv)
-- [Water Level](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/MudcreekWild_waterLevel.csv)
+- [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/Mudcreek/MudcreekWild_pH.csv)
+- [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/Mudcreek/MudcreekWild_salinity_DO.csv)
+- [Water Level](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/Mudcreek/MudcreekWild_waterLevel.csv)
 
 
 ### [Rowley River](https://github.com/GWLab-UML/Massachusetts_WaterQuality/tree/main/PlumIslandSound/RowleyRiver)
@@ -33,8 +33,8 @@ GPS coordinates: 42.725893 N, 70.848708° W
 
 *last download: 08/12/2026*
 
-- [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/RowleyWild_pH.csv)
-- [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/RowleyWild_salinity_DO.csv)
-- [Water Level](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/RowleyWild_waterLevel.csv)
+- [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_pH.csv)
+- [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_salinity_DO.csv)
+- [Water Level](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_waterLevel.csv)
 
 There are additional loggers in this river at a farm site (RowleyFarm prefix in the Rowley River folder). Please contact us if you feel you need more information about these logger files.
