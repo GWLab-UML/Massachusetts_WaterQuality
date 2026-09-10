@@ -1,7 +1,7 @@
 # Massachusetts Water Quality
 Data files from HOBO loggers deployed in Massachusetts waters.
 
-If you have questions, please submit an issue or email julia_mcdonough@student.uml.edu
+If you have questions, please submit an issue or email sarah_gignouxwolfsohn@uml.edu
 
 ## [Plum Island Sound](https://github.com/GWLab-UML/Massachusetts_WaterQuality/tree/main/PlumIslandSound)
 All loggers are set to record data in 15 min intervals.
