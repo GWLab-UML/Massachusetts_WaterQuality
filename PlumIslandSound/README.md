@@ -35,6 +35,7 @@ GPS coordinates: 42.725893 N, 70.848708° W
 
 - [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_pH.csv)
 - [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_salinity_DO.csv)
+    - last download was 7/31/2026
 - [Water Level](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_waterLevel.csv)
 
 There are additional loggers in this river at a farm site (RowleyFarm prefix in the Rowley River folder). Please contact us if you feel you need more information about these logger files.
