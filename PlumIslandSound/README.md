@@ -9,9 +9,9 @@ All loggers are set to record data in 15 min intervals.
 
 ## Data Files:
 ### [Parker River](https://github.com/GWLab-UML/Massachusetts_WaterQuality/tree/main/PlumIslandSound/ParkerRiver)
-GPS coordinates: 42.76357° N, 70.85529° W
+GPS coordinates: 42.763370° N, 70.855394° W
 
-*last download: 08/11/2026*
+*last download: 10/22/2026*
 
 - [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/ParkerWild_pH.csv)
 - [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/ParkerRiver/ParkerWild_salinity_DO.csv)
@@ -21,7 +21,7 @@ GPS coordinates: 42.76357° N, 70.85529° W
 ### [Mudcreek](https://github.com/GWLab-UML/Massachusetts_WaterQuality/tree/main/PlumIslandSound/Mudcreek)
 GPS coordinates: 42.75112° N, 70.83723° W
 
-*last download: 08/11/2026*
+*last download: 10/22/2026*
 
 - [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/Mudcreek/MudcreekWild_pH.csv)
 - [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/Mudcreek/MudcreekWild_salinity_DO.csv)
@@ -29,9 +29,9 @@ GPS coordinates: 42.75112° N, 70.83723° W
 
 
 ### [Rowley River](https://github.com/GWLab-UML/Massachusetts_WaterQuality/tree/main/PlumIslandSound/RowleyRiver)
-GPS coordinates: 42.725893 N, 70.848708° W
+GPS coordinates: 42.726552° N, 70.847501° W
 
-*last download: 08/12/2026*
+*last download: 10/22/2026*
 
 - [pH](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_pH.csv)
 - [DO, Temperature, & Conductivity](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/RowleyRiver/RowleyWild_salinity_DO.csv)
