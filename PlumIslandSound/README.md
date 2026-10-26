@@ -8,6 +8,8 @@ All loggers are set to record data in 15 min intervals.
 - [HOBO pH and Temperature Data Logger](https://www.onsetcomp.com/products/data-loggers/mx2501?_gl=1*1j7oooy*_up*MQ..*_gs*MQ..&gclid=CjwKCAjwuuPRBhAnEiwA2Ji8ekqUN1NzgxEqyMkboHPQcGqycKkcQCl0kV01uG-8-v7Skez7XBAvTxoC8oIQAvD_BwE&gbraid=0AAAAAD-8yJn51hH8P4vqK06c-Jn8x9M1R)
 
 ## Data Files:
+To calculate water depth, a barometric pressure reading is needed *outside* of the water. This data can be found in [Rowley_barometricPressure.csv](https://github.com/GWLab-UML/Massachusetts_WaterQuality/blob/main/PlumIslandSound/Rowley_barometricPressure.csv).
+
 ### [Parker River](https://github.com/GWLab-UML/Massachusetts_WaterQuality/tree/main/PlumIslandSound/ParkerRiver)
 GPS coordinates: 42.763370° N, 70.855394° W
 
