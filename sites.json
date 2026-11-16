@@ -3,9 +3,24 @@
     "name": "Parker River (Wild)",
     "shortCode": "PR",
     "region": "Plum Island Sound",
-    "lat": 42.7545,
-    "lng": -70.8582,
-    "color": "#0284c7",
-    "notes": "Continuous HOBO logger array monitoring pH, salinity, dissolved oxygen, and water level."
+    "lat": 42.76357,
+    "lng": -70.85529,
+    "color": "#0284c7"
+  },
+  "PlumIslandSound/RowleyRiver": {
+    "name": "Rowley River",
+    "shortCode": "RR",
+    "region": "Plum Island Sound",
+    "lat": 42.725893,
+    "lng": -70.848708,
+    "color": "#ea580c"
+  },
+  "PlumIslandSound/Mudcreek": {
+    "name": "Mudcreek",
+    "shortCode": "MC",
+    "region": "Plum Island Sound",
+    "lat": 42.75112,
+    "lng": -70.83723,
+    "color": "#059669"
   }
 }
