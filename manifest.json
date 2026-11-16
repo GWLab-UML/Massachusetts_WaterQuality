@@ -1,4 +1,5 @@
-["PlumIslandSound/Mudcreek/MudcreekWild_pH.csv",
+[
+  "PlumIslandSound/Mudcreek/MudcreekWild_pH.csv",
   "PlumIslandSound/Mudcreek/MudcreekWild_salinity_DO.csv",
   "PlumIslandSound/Mudcreek/MudcreekWild_waterLevel.csv",
   "PlumIslandSound/ParkerRiver/ParkerWild_pH.csv",
@@ -6,4 +7,5 @@
   "PlumIslandSound/ParkerRiver/ParkerWild_waterLevel.csv",
   "PlumIslandSound/RowleyRiver/RowleyWild_pH.csv",
   "PlumIslandSound/RowleyRiver/RowleyWild_salinity_DO.csv",
-  "PlumIslandSound/RowleyRiver/RowleyWild_waterLevel.csv"]
+  "PlumIslandSound/RowleyRiver/RowleyWild_waterLevel.csv"
+]
