@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Massachusetts Water Quality Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f4f7f9; color: #1e293b; }
+    header { background: #0f172a; color: #fff; padding: 1.25rem 2rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+    header h1 { margin: 0; font-size: 1.25rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    select { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #334155; font-size: 0.95rem; background: #1e293b; color: #fff; cursor: pointer; }
+    label.toggle { font-size: 0.88rem; display: flex; align-items: center; gap: 0.4rem; background: #1e293b; padding: 0.48rem 0.75rem; border-radius: 6px; border: 1px solid #334155; cursor: pointer; }
+    main { max-width: 1250px; margin: 2rem auto; padding: 0 1.5rem; }
+    .chart-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .chart-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem; color: #0f172a; }
+    .chart-subtitle { font-size: 0.82rem; color: #64748b; margin-bottom: 0.75rem; }
+    .status { text-align: center; padding: 2rem; color: #64748b; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Massachusetts Water Quality</h1>
+  <div class="controls">
+    <select id="regionSelect"><option>Loading regions...</option></select>
+    <select id="riverSelect"><option>Loading rivers...</option></select>
+    <label class="toggle" title="Uses HOBO 'Water Detect' In/Out flags to exclude air readings">
+      <input type="checkbox" id="filterOutWater" checked />
+      Exclude "Out of Water" rows
+    </label>
+  </div>
+</header>
+
+<main id="dashboard">
+  <div class="status">Scanning repository for river data...</div>
+</main>
+
+<script>
+  const OWNER = "jgmcdonough";
+  const REPO = "Massachusetts_WaterQuality";
+  const BRANCH = "main";
+
+  // Columns to ignore when plotting
+  const IGNORE_COLS = new Set(["#", "Host Connected", "End of File", "Started", "Water Detect"]);
+
+  let repoIndex = {};
+
+  async function init() {
+    const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
+    const data = await res.json();
+
+    data.tree.forEach(item => {
+      if (item.type === "blob" && item.path.endsWith(".csv")) {
+        const parts = item.path.split("/");
+        if (parts.length >= 3) {
+          const [region, river] = parts;
+          repoIndex[region] = repoIndex[region] || {};
+          repoIndex[region][river] = repoIndex[region][river] || [];
+          repoIndex[region][river].push(item.path);
+        }
+      }
+    });
+
+    populateRegions();
+    document.getElementById("filterOutWater").onchange = () => {
+      renderRiver(
+        document.getElementById("regionSelect").value,
+        document.getElementById("riverSelect").value
+      );
+    };
+  }
+
+  function populateRegions() {
+    const regionSelect = document.getElementById("regionSelect");
+    const regions = Object.keys(repoIndex).sort();
+    regionSelect.innerHTML = regions.map(r => `<option value="${r}">${r.replace(/([A-Z])/g, ' $1').trim()}</option>`).join("");
+    regionSelect.onchange = () => populateRivers(regionSelect.value);
+    if (regions.length) populateRivers(regions[0]);
+  }
+
+  function populateRivers(region) {
+    const riverSelect = document.getElementById("riverSelect");
+    const rivers = Object.keys(repoIndex[region]).sort();
+    riverSelect.innerHTML = rivers.map(r => `<option value="${r}">${r.replace(/([A-Z])/g, ' $1').trim()}</option>`).join("");
+    riverSelect.onchange = () => renderRiver(region, riverSelect.value);
+    if (rivers.length) renderRiver(region, rivers[0]);
+  }
+
+  // Normalize HOBO header: collapse non-breaking spaces and remove logger serial tag e.g. (W-DO 22531020)
+  function cleanHeader(raw) {
+    return raw
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\([A-Z0-9-]+\s+\d+\)/g, "")
+      .trim();
+  }
+
+  // Convert "6/12/2026 11:43" -> "2026-06-12 11:43" for Plotly time-series axis
+  function parseHoboDate(str) {
+    if (!str) return null;
+    const [datePart, timePart = "00:00"] = str.trim().split(" ");
+    const [m, d, y] = datePart.split("/");
+    if (!y) return str;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")} ${timePart}`;
+  }
+
+  async function renderRiver(region, river) {
+    const dashboard = document.getElementById("dashboard");
+    const files = repoIndex[region][river];
+    const excludeOut = document.getElementById("filterOutWater").checked;
+
+    dashboard.innerHTML = "";
+
+    for (const filePath of files) {
+      const fileName = filePath.split("/").pop();
+      const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
+
+      Papa.parse(rawUrl, {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: (results) => processAndPlotFile(fileName, results.data, results.meta.fields, excludeOut, dashboard)
+      });
+    }
+  }
+
+  function processAndPlotFile(fileName, rows, rawFields, excludeOut, container) {
+    if (!rows.length) return;
+
+    // Identify Date-Time column and Water Detect column
+    const dateCol = rawFields.find(f => f.toLowerCase().includes("date-time")) || rawFields[1];
+    const waterDetectCol = rawFields.find(f => cleanHeader(f) === "Water Detect");
+
+    // Track in-water state across sparse HOBO event rows ("Out" -> "In")
+    let currentlyOut = false;
+    const filteredRows = rows.filter(row => {
+      if (waterDetectCol && row[waterDetectCol]) {
+        const flag = String(row[waterDetectCol]).trim().toLowerCase();
+        if (flag === "out") currentlyOut = true;
+        if (flag === "in") currentlyOut = false;
+      }
+      return excludeOut ? !currentlyOut : true;
+    });
+
+    const timestamps = filteredRows.map(r => parseHoboDate(r[dateCol]));
+
+    // Build cleaned numeric series
+    const series = [];
+    rawFields.forEach(rawCol => {
+      const label = cleanHeader(rawCol);
+      if (rawCol === dateCol || IGNORE_COLS.has(label)) return;
+
+      const values = filteredRows.map(r => (typeof r[rawCol] === "number" ? r[rawCol] : null));
+      if (values.some(v => v !== null)) {
+        series.push({ rawCol, label, values });
+      }
+    });
+
+    // If this is a combined Salinity + DO file, split into two clean dual-axis cards
+    const hasDO = series.some(s => s.label.includes("DO"));
+    const hasSalinity = series.some(s => s.label.includes("Salinity (PSU)"));
+
+    if (hasDO && hasSalinity) {
+      // Card 1: Dissolved Oxygen (mg/L) + Water Temperature (°C)
+      const doSeries = series.filter(s => s.label.includes("DO"));
+      const tempSeries = series.filter(s => s.label.startsWith("Temperature")).slice(0, 1); // primary temp sensor
+      createDualAxisCard(
+        container,
+        `${fileName} — Dissolved Oxygen & Temperature`,
+        `${filteredRows.length.toLocaleString()} readings`,
+        timestamps,
+        doSeries, "Dissolved Oxygen (mg/L)",
+        tempSeries, "Temperature (°C)"
+      );
+
+      // Card 2: Salinity (PSU) + Specific Conductivity (µS/cm)
+      const salSeries = series.filter(s => s.label.includes("Salinity (PSU)"));
+      const condSeries = series.filter(s => s.label.includes("Specific Conductivity"));
+      createDualAxisCard(
+        container,
+        `${fileName} — Salinity & Specific Conductivity`,
+        `${filteredRows.length.toLocaleString()} readings`,
+        timestamps,
+        salSeries, "Salinity (PSU)",
+        condSeries, "Specific Conductivity (µS/cm)"
+      );
+    } else {
+      // Standard single-card plot (e.g., pH or Water Level)
+      createSingleAxisCard(container, fileName, `${filteredRows.length.toLocaleString()} readings`, timestamps, series);
+    }
+  }
+
+  function createDualAxisCard(container, title, subtitle, x, leftSeries, leftTitle, rightSeries, rightTitle) {
+    const id = "plot-" + Math.random().toString(36).slice(2, 9);
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.innerHTML = `<div class="chart-title">${title}</div><div class="chart-subtitle">${subtitle}</div><div id="${id}" style="height:380px;"></div>`;
+    container.appendChild(card);
+
+    const traces = [
+      ...leftSeries.map(s => ({ x, y: s.values, name: s.label, type: "scatter", mode: "lines", yaxis: "y" })),
+      ...rightSeries.map(s => ({ x, y: s.values, name: s.label, type: "scatter", mode: "lines", yaxis: "y2", line: { dash: "dot" } }))
+    ];
+
+    Plotly.newPlot(id, traces, {
+      margin: { t: 15, r: 65, b: 40, l: 60 },
+      xaxis: { rangeslider: { visible: true } },
+      yaxis: { title: leftTitle },
+      yaxis2: { title: rightTitle, overlaying: "y", side: "right", showgrid: false },
+      hovermode: "x unified",
+      legend: { orientation: "h", y: 1.12 }
+    }, { responsive: true });
+  }
+
+  function createSingleAxisCard(container, title, subtitle, x, seriesList) {
+    const id = "plot-" + Math.random().toString(36).slice(2, 9);
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.innerHTML = `<div class="chart-title">${title}</div><div class="chart-subtitle">${subtitle}</div><div id="${id}" style="height:360px;"></div>`;
+    container.appendChild(card);
+
+    const traces = seriesList.map(s => ({ x, y: s.values, name: s.label, type: "scatter", mode: "lines" }));
+
+    Plotly.newPlot(id, traces, {
+      margin: { t: 15, r: 30, b: 40, l: 60 },
+      xaxis: { rangeslider: { visible: true } },
+      hovermode: "x unified",
+      legend: { orientation: "h", y: 1.12 }
+    }, { responsive: true });
+  }
+
+  init();
+</script>
+</body>
+</html>
