@@ -86,7 +86,7 @@
     .logger-pin {
       display: flex; align-items: center; justify-content: center;
       width: 28px; height: 28px; border-radius: 50%; background: #fff;
-      border: 2.5px solid #240046; font-size: 11px; font-weight: 700; color: #0f172a;
+      border: 2.5px solid #7B2FF7; font-size: 11px; font-weight: 700; color: #0f172a;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
     .logger-pin.selected { color: #fff; transform: scale(1.15); }
@@ -178,7 +178,7 @@
     <div class="chart-box">
       <div class="chart-header">
         <h3 id="activeMetricTitle">Water Temperature</h3>
-        <span id="activeMetricUnit">Degrees Celsius (°C)</span>
+        <span id="activeMetricUnit">Degrees Fahrenheit (°F)</span>
       </div>
       <div id="mainChart" style="height: 410px;"></div>
     </div>
@@ -191,16 +191,16 @@
   const BRANCH = "main";
   const CARTO_KEY = "cb1_5adm_1_adff386630b870a13660b8f1";
 
-  // Explicit color overrides for known sites, with fallback palette
+  // Your custom color assignments
   const SITE_COLORS = {
-    "ParkerRiver": "#240046",
-    "Mudcreek": "#FFBE0B",
-    "RowleyRiver": "#E63946"
+    "parkerriver": "#7B2FF7",
+    "mudcreek": "#00C2FF",
+    "rowleyriver": "#FF2E63"
   };
-  const FALLBACK_PALETTE = ["#240046", "#E63946", "#FFBE0B", "#1d3557", "#457b9d", "#2a9d8f"];
+  const FALLBACK_PALETTE = ["#7B2FF7", "#00C2FF", "#FF2E63", "#4361EE", "#3A0CA3", "#F72585"];
 
   const METRIC_DEFS = [
-    { key: "temp", label: "Water Temperature", unit: "°C", match: h => h.startsWith("Temperature") },
+    { key: "temp", label: "Water Temperature", unit: "°F", match: h => h.startsWith("Temperature") },
     { key: "salinity", label: "Salinity", unit: "PSU", match: h => h.includes("Salinity (PSU)") },
     { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", match: h => h.includes("Salinity-Adjusted DO") },
     { key: "do_meas", label: "Measured DO", unit: "mg/L", match: h => h.includes("Measured DO") },
@@ -231,11 +231,18 @@
     return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timePart.padStart(5, "0")}:00`);
   }
 
+  function cToF(c) {
+    if (c == null || isNaN(c)) return null;
+    return (c * 9/5) + 32;
+  }
+
   function calcMean(records, key) {
     let sum = 0, count = 0;
     for (const r of records) {
-      if (typeof r[key] === "number" && !isNaN(r[key])) {
-        sum += r[key];
+      let val = r[key];
+      if (key === "temp") val = cToF(val);
+      if (typeof val === "number" && !isNaN(val)) {
+        sum += val;
         count++;
       }
     }
@@ -277,7 +284,8 @@
         if (!state.sites[siteKey]) {
           const meta = siteMeta[siteKey] || {};
           const folderName = parts[1];
-          const assignedColor = meta.color || SITE_COLORS[folderName] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length];
+          const lowerFolder = folderName.toLowerCase();
+          const assignedColor = meta.color || SITE_COLORS[lowerFolder] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length];
 
           state.sites[siteKey] = {
             key: siteKey,
@@ -287,7 +295,6 @@
             lat: meta.lat ?? (42.755 + idx * 0.02),
             lng: meta.lng ?? (-70.858 - idx * 0.015),
             color: assignedColor,
-            notes: meta.notes || "Continuous water quality monitoring station.",
             files: [],
             records: []
           };
@@ -504,9 +511,10 @@
           <h3 style="margin:0 0 0.2rem;">All monitoring sites</h3>
           <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1.1rem;">Overall averages · Data through ${dateStr}</div>
           ${sites.map(s => {
-            const avgTemp = calcMean(s.records, "temp");
+            const avgTempC = calcMean(s.records, "temp");
+            const avgTempF = cToF(avgTempC);
             const avgSal = calcMean(s.records, "salinity");
-            const tempStr = avgTemp != null ? `${avgTemp.toFixed(1)}°` : "—";
+            const tempStr = avgTempF != null ? `${avgTempF.toFixed(1)}°` : "—";
             const subStr = avgSal != null
               ? `Avg salinity: ${avgSal.toFixed(1)} PSU · ${s.records.length.toLocaleString()} pts`
               : `${s.files.length} datasets · ${s.records.length.toLocaleString()} pts`;
@@ -519,12 +527,12 @@
                 </div>
                 <div style="text-align:right;">
                   <div style="font-size:1.35rem; font-weight:700;">${tempStr}</div>
-                  <div style="font-size:0.75rem; color:var(--muted);">avg water °C</div>
+                  <div style="font-size:0.75rem; color:var(--muted);">avg water °F</div>
                 </div>
               </div>`;
           }).join("")}
         </div>
-        <div style="font-size:0.82rem; color:var(--muted);">Click any station card or map marker to view monthly & all-time averages.</div>
+        <div style="font-size:0.82rem; color:var(--muted);">Click any site card or map marker to view monthly & all-time averages.</div>
       `;
     } else {
       const s = state.sites[state.selectedSite];
@@ -542,8 +550,9 @@
           });
 
       const fmtMean = (key, d = 1, roundInt = false) => {
-        const val = calcMean(filteredRecords, key);
+        let val = calcMean(filteredRecords, key);
         if (val == null) return "—";
+        if (key === "temp") val = cToF(val);
         return roundInt ? Math.round(val).toLocaleString() : val.toFixed(d);
       };
 
@@ -573,7 +582,7 @@
           </div>
 
           <div class="metric-grid">
-            <div class="metric-item"><div class="m-label">Avg water temperature</div><div class="m-val">${fmtMean("temp", 1)} <span class="m-unit">°C</span></div></div>
+            <div class="metric-item"><div class="m-label">Avg water temperature</div><div class="m-val">${fmtMean("temp", 1)} <span class="m-unit">°F</span></div></div>
             <div class="metric-item"><div class="m-label">Avg salinity</div><div class="m-val">${fmtMean("salinity", 1)} <span class="m-unit">PSU</span></div></div>
             <div class="metric-item"><div class="m-label">Avg salinity-adjusted DO</div><div class="m-val">${fmtMean("do_adj", 2)} <span class="m-unit">mg/L</span></div></div>
             <div class="metric-item"><div class="m-label">Avg specific conductivity</div><div class="m-val">${fmtMean("sp_cond", 0, true)} <span class="m-unit">µS/cm</span></div></div>
@@ -582,7 +591,7 @@
           </div>
 
           <div style="border-top:1px solid var(--border); padding-top:0.85rem;">
-            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Station notes</div>
+            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;"></div>
             <div style="font-size:0.88rem; color:#475569;">${s.notes}</div>
           </div>
         </div>
@@ -615,9 +624,15 @@
       const step = Math.max(1, Math.floor(pts.length / 2500));
       const sampled = pts.filter((_, i) => i % step === 0);
 
+      const yValues = sampled.map(r => {
+        let val = r[metricDef.key];
+        if (metricDef.key === "temp") val = cToF(val);
+        return val;
+      });
+
       return {
         x: sampled.map(r => r.date),
-        y: sampled.map(r => r[metricDef.key]),
+        y: yValues,
         name: site.name,
         type: "scatter",
         mode: "lines",
