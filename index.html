@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Massachusetts Coastal & River Water Quality</title>
-  <!-- Leaflet Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Plotly & PapaParse -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
@@ -17,7 +15,6 @@
       --border: #e2e8f0;
       --text: #0f172a;
       --muted: #64748b;
-      --accent: #0f172a;
     }
     * { box-sizing: border-box; }
     body {
@@ -63,7 +60,7 @@
 
     /* Explore the Sites 2-Col Grid */
     .explore-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.5rem; align-items: stretch; }
-    #map { height: 430px; border-radius: 12px; border: 1px solid var(--border); z-index: 1; }
+    #map { height: 450px; border-radius: 12px; border: 1px solid var(--border); z-index: 1; }
     .site-panel {
       border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
       display: flex; flex-direction: column; justify-content: space-between; background: #fff;
@@ -74,7 +71,17 @@
       cursor: pointer; transition: border-color 0.15s, background 0.15s;
     }
     .site-card-item:hover { background: var(--surface); border-color: #94a3b8; }
-    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; margin: 1.25rem 0; }
+    .period-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.5rem 0.75rem; margin-top: 0.85rem;
+    }
+    .period-bar label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .period-bar select {
+      border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem;
+      font-size: 0.85rem; font-weight: 600; background: #fff; color: var(--text); cursor: pointer;
+    }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.1rem 0; }
     .metric-item .m-label { font-size: 0.8rem; color: var(--muted); }
     .metric-item .m-val { font-size: 1.35rem; font-weight: 700; }
     .metric-item .m-unit { font-size: 0.85rem; font-weight: 400; color: var(--muted); }
@@ -140,12 +147,12 @@
     </div>
   </header>
 
-  <!-- 2. Explore the Sites (Map + Site Details) -->
+  <!-- 2. Explore the Sites (Map + Site Averages) -->
   <section>
     <div class="section-header">
       <div>
         <h2>Explore the sites</h2>
-        <p>Select a river station on the map or filter pills to inspect latest conditions.</p>
+        <p>Select a river station on the map or filter pills to inspect average conditions.</p>
       </div>
       <div class="pill-group" id="sitePills"></div>
     </div>
@@ -190,10 +197,10 @@
   const OWNER = "GWLab-UML";
   const REPO = "Massachusetts_WaterQuality";
   const BRANCH = "main";
+  const CARTO_KEY = "cb1_5adm_1_adff386630b870a13660b8f1";
 
   const PALETTE = ["#0284c7", "#ea580c", "#059669", "#7c3aed", "#db2777", "#d97706"];
 
-  // Standardized metrics extracted from HOBO CSV headers
   const METRIC_DEFS = [
     { key: "temp", label: "Water Temperature", unit: "°C", match: h => h.startsWith("Temperature") },
     { key: "salinity", label: "Salinity", unit: "PSU", match: h => h.includes("Salinity (PSU)") },
@@ -205,8 +212,9 @@
   ];
 
   let state = {
-    sites: {},          // { "PlumIslandSound/ParkerRiver": { name, lat, lng, color, rawFiles: [], rows: [] } }
+    sites: {},
     selectedSite: "ALL",
+    selectedPeriod: "ALL", // "ALL" or "YYYY-MM"
     selectedMetric: "temp",
     rangeDays: "all",
     map: null,
@@ -225,15 +233,37 @@
     return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timePart.padStart(5, "0")}:00`);
   }
 
+  // Helper: compute mean of a numeric metric key across an array of records
+  function calcMean(records, key) {
+    let sum = 0, count = 0;
+    for (const r of records) {
+      if (typeof r[key] === "number" && !isNaN(r[key])) {
+        sum += r[key];
+        count++;
+      }
+    }
+    return count > 0 ? sum / count : null;
+  }
+
+  // Helper: extract sorted unique "YYYY-MM" keys from records (newest first)
+  function getAvailableMonths(records) {
+    const map = new Map();
+    for (const r of records) {
+      const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
+      if (!map.has(ym)) {
+        map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }
+
   async function init() {
-    // 1. Load optional sites.json for coordinates/notes
     let siteMeta = {};
     try {
       const metaRes = await fetch(`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/sites.json`);
       if (metaRes.ok) siteMeta = await metaRes.json();
     } catch (_) {}
 
-    // 2. Discover CSVs via GitHub Tree API
     const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
     const treeData = await treeRes.json();
 
@@ -241,7 +271,6 @@
       .filter(item => item.type === "blob" && item.path.endsWith(".csv"))
       .map(item => item.path);
 
-    // Group by Region/River
     let idx = 0;
     for (const path of csvPaths) {
       const parts = path.split("/");
@@ -259,7 +288,7 @@
           color: meta.color || PALETTE[idx % PALETTE.length],
           notes: meta.notes || "Continuous water quality monitoring station.",
           files: [],
-          records: [] // unified time-sorted objects
+          records: []
         };
         idx++;
       }
@@ -274,7 +303,7 @@
 
   function initMap() {
     state.map = L.map("map", { scrollWheelZoom: false }).setView([42.76, -70.85], 12);
-    L.tileLayer("https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=cb1_5adm_1_adff386630b870a13660b8f1", {
+    L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       maxZoom: 18
     }).addTo(state.map);
@@ -292,6 +321,7 @@
       const marker = L.marker([site.lat, site.lng], { icon }).addTo(state.map);
       marker.on("click", () => {
         state.selectedSite = (state.selectedSite === site.key) ? "ALL" : site.key;
+        state.selectedPeriod = "ALL";
         renderAll();
       });
       state.markers[site.key] = marker;
@@ -305,7 +335,7 @@
     const excludeOut = document.getElementById("filterOutWater").checked;
 
     for (const site of Object.values(state.sites)) {
-      const timeMap = new Map(); // timestamp ms -> { date, metrics... }
+      const timeMap = new Map();
 
       for (const filePath of site.files) {
         const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
@@ -321,7 +351,6 @@
         const dateCol = rawFields.find(f => f.toLowerCase().includes("date-time")) || rawFields[1];
         const waterDetectCol = rawFields.find(f => cleanHeader(f) === "Water Detect");
 
-        // Map raw columns to standardized METRIC_DEFS
         const colMapping = [];
         rawFields.forEach(rc => {
           const clean = cleanHeader(rc);
@@ -363,7 +392,6 @@
       renderAll();
     };
 
-    // Range pills
     document.querySelectorAll("#rangePills .pill").forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll("#rangePills .pill").forEach(b => b.classList.remove("active"));
@@ -373,198 +401,8 @@
       };
     });
 
-    // Metric pills (only show metrics present in the data)
     const availableKeys = new Set();
     Object.values(state.sites).forEach(s => s.records.forEach(r => Object.keys(r).forEach(k => availableKeys.add(k))));
     const availableMetrics = METRIC_DEFS.filter(m => availableKeys.has(m.key));
     if (availableMetrics.length && !availableKeys.has(state.selectedMetric)) {
       state.selectedMetric = availableMetrics[0].key;
-    }
-
-    const metricPills = document.getElementById("metricPills");
-    metricPills.innerHTML = availableMetrics.map(m =>
-      `<button class="pill ${m.key === state.selectedMetric ? "active" : ""}" data-metric="${m.key}">${m.label}</button>`
-    ).join("");
-
-    metricPills.querySelectorAll(".pill").forEach(btn => {
-      btn.onclick = () => {
-        metricPills.querySelectorAll(".pill").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        state.selectedMetric = btn.dataset.metric;
-        renderChart();
-      };
-    });
-  }
-
-  function renderAll() {
-    renderKPIs();
-    renderSitePills();
-    renderSitePanel();
-    updateMapPins();
-    renderChart();
-  }
-
-  function renderKPIs() {
-    const sites = Object.values(state.sites);
-    const totalReadings = sites.reduce((sum, s) => sum + s.records.length, 0);
-    let latest = null;
-    sites.forEach(s => {
-      if (s.records.length) {
-        const d = s.records[s.records.length - 1].date;
-        if (!latest || d > latest) latest = d;
-      }
-    });
-
-    document.getElementById("kpiSites").textContent = sites.length;
-    document.getElementById("kpiReadings").textContent = totalReadings.toLocaleString();
-    document.getElementById("kpiLatestDate").textContent = latest
-      ? latest.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-      : "—";
-  }
-
-  function renderSitePills() {
-    const container = document.getElementById("sitePills");
-    const sites = Object.values(state.sites);
-    let html = `<button class="pill ${state.selectedSite === "ALL" ? "active" : ""}" data-site="ALL">All sites</button>`;
-    sites.forEach(s => {
-      const active = state.selectedSite === s.key ? "active" : "";
-      html += `<button class="pill ${active}" data-site="${s.key}">
-        <span class="dot" style="background:${s.color}"></span>${s.name}
-      </button>`;
-    });
-    container.innerHTML = html;
-
-    container.querySelectorAll(".pill").forEach(btn => {
-      btn.onclick = () => {
-        state.selectedSite = btn.dataset.site;
-        renderAll();
-      };
-    });
-  }
-
-  function updateMapPins() {
-    Object.values(state.sites).forEach(s => {
-      const el = document.getElementById(`pin-${s.key.replace("/", "-")}`);
-      if (!el) return;
-      if (state.selectedSite === s.key) {
-        el.classList.add("selected");
-        el.style.background = s.color;
-      } else {
-        el.classList.remove("selected");
-        el.style.background = "#fff";
-      }
-    });
-  }
-
-  function renderSitePanel() {
-    const panel = document.getElementById("sitePanel");
-    const sites = Object.values(state.sites);
-
-    if (state.selectedSite === "ALL") {
-      const latestGlobal = sites.map(s => s.records.at(-1)?.date).filter(Boolean).sort((a, b) => b - a)[0];
-      const dateStr = latestGlobal ? latestGlobal.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
-
-      panel.innerHTML = `
-        <div>
-          <h3 style="margin:0 0 0.2rem;">All monitoring sites</h3>
-          <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1.1rem;">Most recent reading ${dateStr}</div>
-          ${sites.map(s => {
-            const last = s.records.at(-1) || {};
-            const temp = last.temp != null ? `${last.temp.toFixed(1)}°` : "—";
-            const sal = last.salinity != null ? `Salinity: ${last.salinity.toFixed(1)} PSU` : `${s.files.length} datasets`;
-            return `
-              <div class="site-card-item" style="border-left: 4px solid ${s.color}" onclick="state.selectedSite='${s.key}'; renderAll();">
-                <div>
-                  <div style="font-weight:700;">${s.name}</div>
-                  <div style="font-size:0.83rem; color:var(--muted);">${sal} · ${s.records.length.toLocaleString()} pts</div>
-                </div>
-                <div style="text-align:right;">
-                  <div style="font-size:1.35rem; font-weight:700;">${temp}</div>
-                  <div style="font-size:0.75rem; color:var(--muted);">water °C</div>
-                </div>
-              </div>`;
-          }).join("")}
-        </div>
-        <div style="font-size:0.82rem; color:var(--muted);">Click any station card or map marker to view full sensor details.</div>
-      `;
-    } else {
-      const s = state.sites[state.selectedSite];
-      const last = s.records.at(-1) || {};
-      const dateStr = last.date ? last.date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—";
-      const fmt = (v, d = 1) => (v != null ? v.toFixed(d) : "—");
-
-      panel.innerHTML = `
-        <div>
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="display:flex; align-items:center; gap:0.5rem;">
-              <span class="dot" style="background:${s.color}; width:10px; height:10px;"></span>
-              <h3 style="margin:0;">${s.name}</h3>
-            </div>
-            <a href="#" onclick="event.preventDefault(); state.selectedSite='ALL'; renderAll();" style="font-size:0.85rem; color:var(--text);">All sites</a>
-          </div>
-          <div style="font-size:0.85rem; color:var(--muted); margin-top:0.2rem;">Last sampled ${dateStr} · ${s.records.length.toLocaleString()} readings</div>
-
-          <div class="metric-grid">
-            <div class="metric-item"><div class="m-label">Water temperature</div><div class="m-val">${fmt(last.temp)} <span class="m-unit">°C</span></div></div>
-            <div class="metric-item"><div class="m-label">Salinity</div><div class="m-val">${fmt(last.salinity)} <span class="m-unit">PSU</span></div></div>
-            <div class="metric-item"><div class="m-label">Salinity-adjusted DO</div><div class="m-val">${fmt(last.do_adj, 2)} <span class="m-unit">mg/L</span></div></div>
-            <div class="metric-item"><div class="m-label">Specific conductivity</div><div class="m-val">${last.sp_cond != null ? Math.round(last.sp_cond).toLocaleString() : "—"} <span class="m-unit">µS/cm</span></div></div>
-            <div class="metric-item"><div class="m-label">pH</div><div class="m-val">${fmt(last.ph, 2)}</div></div>
-            <div class="metric-item"><div class="m-label">Water level</div><div class="m-val">${fmt(last.level, 2)} <span class="m-unit">m</span></div></div>
-          </div>
-
-          <div style="border-top:1px solid var(--border); padding-top:0.85rem;">
-            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Station notes</div>
-            <div style="font-size:0.88rem; color:#475569;">${s.notes}</div>
-          </div>
-        </div>
-      `;
-    }
-  }
-
-  function renderChart() {
-    const metricDef = METRIC_DEFS.find(m => m.key === state.selectedMetric) || METRIC_DEFS[0];
-    document.getElementById("activeMetricTitle").textContent = metricDef.label;
-    document.getElementById("activeMetricUnit").textContent = metricDef.unit;
-
-    const sitesToPlot = state.selectedSite === "ALL"
-      ? Object.values(state.sites)
-      : [state.sites[state.selectedSite]];
-
-    const traces = sitesToPlot.map(site => {
-      let pts = site.records.filter(r => r[metricDef.key] != null);
-
-      if (state.rangeDays !== "all" && pts.length) {
-        const cutoff = new Date(pts[pts.length - 1].date.getTime() - Number(state.rangeDays) * 86400000);
-        pts = pts.filter(r => r.date >= cutoff);
-      }
-
-      // Downsample if > 2,500 points so browser stays snappy
-      const step = Math.max(1, Math.floor(pts.length / 2500));
-      const sampled = pts.filter((_, i) => i % step === 0);
-
-      return {
-        x: sampled.map(r => r.date),
-        y: sampled.map(r => r[metricDef.key]),
-        name: site.name,
-        type: "scatter",
-        mode: "lines",
-        line: { color: site.color, width: 2 }
-      };
-    });
-
-    Plotly.newPlot("mainChart", traces, {
-      margin: { t: 10, r: 25, b: 40, l: 55 },
-      xaxis: { showgrid: false, linecolor: "#cbd5e1" },
-      yaxis: { title: metricDef.unit, gridcolor: "#f1f5f9", zeroline: false },
-      hovermode: "x unified",
-      legend: { orientation: "h", y: 1.08 },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff"
-    }, { responsive: true });
-  }
-
-  init();
-</script>
-</body>
-</html>
