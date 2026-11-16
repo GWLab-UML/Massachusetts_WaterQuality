@@ -274,7 +274,7 @@
 
   function initMap() {
     state.map = L.map("map", { scrollWheelZoom: false }).setView([42.76, -70.85], 12);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=cb1_5adm_1_adff386630b870a13660b8f1", {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       maxZoom: 18
     }).addTo(state.map);
