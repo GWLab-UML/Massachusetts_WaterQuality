@@ -1,0 +1,11 @@
+{
+  "PlumIslandSound/ParkerRiver": {
+    "name": "Parker River (Wild)",
+    "shortCode": "PR",
+    "region": "Plum Island Sound",
+    "lat": 42.7545,
+    "lng": -70.8582,
+    "color": "#0284c7",
+    "notes": "Continuous HOBO logger array monitoring pH, salinity, dissolved oxygen, and water level."
+  }
+}
