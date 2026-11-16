@@ -33,11 +33,19 @@
     .hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2.5rem; align-items: start; margin-bottom: 3.5rem; }
     .hero h1 { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 0; }
     .hero p { font-size: 1.05rem; color: #334155; margin: 0 0 2rem; max-width: 60ch; }
-    .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    
+    .hero-image-box {
+      width: 100%; height: 260px; border-radius: 12px; border: 1px solid var(--border);
+      overflow: hidden; background: var(--surface); display: flex; align-items: center; justify-content: center;
+    }
+    .hero-image-box img { width: 100%; height: 100%; object-fit: cover; }
+
+    .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 2rem; }
     .kpi-box { border-top: 2px solid var(--text); padding-top: 0.75rem; }
     .kpi-num { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
     .kpi-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
-    .hero-aside { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.9rem; color: #475569; }
+    
+    .hero-aside { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.9rem; color: #475569; margin-top: 1.5rem; }
     .hero-aside strong { color: var(--text); display: block; margin-bottom: 0.35rem; }
 
     section { margin-bottom: 4rem; }
@@ -94,11 +102,21 @@
     }
     .logger-pin.selected { color: #fff; transform: scale(1.15); }
 
-    .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
     .chart-box { border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; background: #fff; }
     .chart-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
     .chart-header h3 { margin: 0; font-size: 1.15rem; }
     .chart-header span { font-size: 0.85rem; color: var(--muted); }
+
+    .chart-filter-bar {
+      display: flex; align-items: center; gap: 0.75rem; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.75rem;
+    }
+    .chart-filter-bar label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .chart-filter-bar select {
+      border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem;
+      font-size: 0.85rem; font-weight: 600; background: #fff; color: var(--text); cursor: pointer;
+    }
 
     .site-footer {
       margin-top: 5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
@@ -126,35 +144,43 @@
         We deploy submersible HOBO data loggers to track temperature, salinity, dissolved oxygen, pH, and tidal water levels
         to understand estuarine dynamics and coastal ecosystem health.
       </p>
-      <div class="kpi-row">
-        <div class="kpi-box">
-          <div class="kpi-num" id="kpiSites">—</div>
-          <div class="kpi-label">logger sites</div>
-        </div>
-        <div class="kpi-box">
-          <div class="kpi-num" id="kpiReadings">—</div>
-          <div class="kpi-label">verified readings</div>
-        </div>
-        <div class="kpi-box">
-          <div class="kpi-num" id="kpiLatestDate">—</div>
-          <div class="kpi-label">latest logger offload</div>
+
+      <div class="hero-aside">
+        <strong>About the Sensor Network</strong>
+        Submersible HOBO conductivity, dissolved oxygen, pH, and water level loggers record measurements every 15 minutes.
+        Out-of-water deployment intervals are automatically filtered using logger water-detect flags.
+        <div style="margin-top:0.85rem; padding-top:0.75rem; border-top:1px solid var(--border);">
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-weight:500; color:var(--text);">
+            <input type="checkbox" id="filterOutWater" checked />
+            Exclude "Out of Water" readings
+          </label>
         </div>
       </div>
     </div>
-    <div class="hero-aside">
-      <strong>About the Sensor Network</strong>
-      Submersible HOBO conductivity, dissolved oxygen, pH, and water level loggers record measurements every 15 minutes.
-      Out-of-water deployment intervals are automatically filtered using logger water-detect flags.
-      <div style="margin-top:0.85rem; padding-top:0.75rem; border-top:1px solid var(--border);">
-        <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-weight:500; color:var(--text);">
-          <input type="checkbox" id="filterOutWater" checked />
-          Exclude "Out of Water" readings
-        </label>
+
+    <div>
+      <div class="hero-image-box">
+        <img src="site_photo.jpg" alt="Field Deployment" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\'color:var(--muted); font-size:0.9rem;\'>Upload site_photo.jpg to repo</span>';" />
       </div>
     </div>
   </header>
 
-  <section>
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-num" id="kpiSites">—</div>
+      <div class="kpi-label">logger sites</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-num" id="kpiReadings">—</div>
+      <div class="kpi-label">verified readings</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-num" id="kpiLatestDate">—</div>
+      <div class="kpi-label">latest logger offload</div>
+    </div>
+  </div>
+
+  <section style="margin-top: 3.5rem;">
     <div class="section-header">
       <div>
         <h2>Explore the sites</h2>
@@ -177,15 +203,16 @@
         <h2>Water chemistry over time</h2>
         <p>Compare water quality metrics across selected sites and time windows.</p>
       </div>
-      <div class="pill-group" id="rangePills">
-        <button class="pill" data-days="7">Last 7 days</button>
-        <button class="pill" data-days="30">Last 30 days</button>
-        <button class="pill active" data-days="all">All data</button>
-      </div>
     </div>
 
     <div class="toolbar">
       <div class="pill-group" id="metricPills"></div>
+      <div class="chart-filter-bar">
+        <label for="chartPeriodSelect">Time window:</label>
+        <select id="chartPeriodSelect">
+          <option value="ALL">All data</option>
+        </select>
+      </div>
     </div>
 
     <div class="chart-box">
@@ -229,8 +256,8 @@
     sites: {},
     selectedSite: "ALL",
     selectedPeriod: "ALL",
+    selectedChartPeriod: "ALL",
     selectedMetric: "temp",
-    rangeDays: "all",
     map: null,
     markers: {}
   };
@@ -247,7 +274,6 @@
     return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timePart.padStart(5, "0")}:00`);
   }
 
-  // Convert Celsius to Fahrenheit safely (handles raw C values around 0-35)
   function cToF(c) {
     if (c == null || isNaN(c)) return null;
     return (c * 9/5) + 32;
@@ -273,6 +299,19 @@
         map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
       }
     }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }
+
+  function getAllAvailableMonthsAcrossSites() {
+    const map = new Map();
+    Object.values(state.sites).forEach(site => {
+      site.records.forEach(r => {
+        const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
+        if (!map.has(ym)) {
+          map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+        }
+      });
+    });
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }
 
@@ -408,7 +447,6 @@
 
           colMapping.forEach(({ rawCol, key }) => {
             if (typeof r[rawCol] === "number") {
-              // Normalize temperature to Fahrenheit right upon ingestion
               entry[key] = (key === "temp") ? cToF(r[rawCol]) : r[rawCol];
             }
           });
@@ -422,17 +460,11 @@
   function setupControls() {
     document.getElementById("filterOutWater").onchange = async () => {
       await loadAllCSVData();
+      updateChartPeriodDropdown();
       renderAll();
     };
 
-    document.querySelectorAll("#rangePills .pill").forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll("#rangePills .pill").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        state.rangeDays = btn.dataset.days;
-        renderChart();
-      };
-    });
+    updateChartPeriodDropdown();
 
     const availableKeys = new Set();
     Object.values(state.sites).forEach(s => s.records.forEach(r => Object.keys(r).forEach(k => availableKeys.add(k))));
@@ -456,11 +488,27 @@
     });
   }
 
+  function updateChartPeriodDropdown() {
+    const select = document.getElementById("chartPeriodSelect");
+    const months = getAllAvailableMonthsAcrossSites();
+    
+    select.innerHTML = `
+      <option value="ALL" ${state.selectedChartPeriod === "ALL" ? "selected" : ""}>All data</option>
+      ${months.map(([ym, label]) => `<option value="${ym}" ${state.selectedChartPeriod === ym ? "selected" : ""}>${label}</option>`).join("")}
+    `;
+
+    select.onchange = (e) => {
+      state.selectedChartPeriod = e.target.value;
+      renderChart();
+    };
+  }
+
   function renderAll() {
     renderKPIs();
     renderSitePills();
     renderSitePanel();
     updateMapPins();
+    updateChartPeriodDropdown();
     renderChart();
   }
 
@@ -626,9 +674,11 @@
     const traces = sitesToPlot.map(site => {
       let pts = site.records.filter(r => r[metricDef.key] != null);
 
-      if (state.rangeDays !== "all" && pts.length) {
-        const cutoff = new Date(pts[pts.length - 1].date.getTime() - Number(state.rangeDays) * 86400000);
-        pts = pts.filter(r => r.date >= cutoff);
+      if (state.selectedChartPeriod !== "ALL") {
+        pts = pts.filter(r => {
+          const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
+          return ym === state.selectedChartPeriod;
+        });
       }
 
       const step = Math.max(1, Math.floor(pts.length / 2500));
