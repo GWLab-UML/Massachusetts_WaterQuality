@@ -86,7 +86,7 @@
     .logger-pin {
       display: flex; align-items: center; justify-content: center;
       width: 28px; height: 28px; border-radius: 50%; background: #fff;
-      border: 2.5px solid #0072B2; font-size: 11px; font-weight: 700; color: #0f172a;
+      border: 2.5px solid #240046; font-size: 11px; font-weight: 700; color: #0f172a;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
     .logger-pin.selected { color: #fff; transform: scale(1.15); }
@@ -191,7 +191,13 @@
   const BRANCH = "main";
   const CARTO_KEY = "cb1_5adm_1_adff386630b870a13660b8f1";
 
-  const PALETTE = ["#0072B2", "#D55E00", "#882255", "#009E73", "#CC79A7", "#E69F00"];
+  // Explicit color overrides for known sites, with fallback palette
+  const SITE_COLORS = {
+    "ParkerRiver": "#240046",
+    "Mudcreek": "#E63946",
+    "RowleyRiver": "#FFBE0B"
+  };
+  const FALLBACK_PALETTE = ["#240046", "#E63946", "#FFBE0B", "#1d3557", "#457b9d", "#2a9d8f"];
 
   const METRIC_DEFS = [
     { key: "temp", label: "Water Temperature", unit: "°C", match: h => h.startsWith("Temperature") },
@@ -255,7 +261,6 @@
         if (metaRes.ok) siteMeta = await metaRes.json();
       } catch (_) {}
 
-      // Automatically scan GitHub repo tree (no manifest needed)
       const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
       if (!treeRes.ok) throw new Error(`GitHub API error (${treeRes.status})`);
       const treeData = await treeRes.json();
@@ -271,14 +276,17 @@
         const siteKey = `${parts[0]}/${parts[1]}`;
         if (!state.sites[siteKey]) {
           const meta = siteMeta[siteKey] || {};
+          const folderName = parts[1];
+          const assignedColor = meta.color || SITE_COLORS[folderName] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length];
+
           state.sites[siteKey] = {
             key: siteKey,
-            name: meta.name || parts[1].replace(/([A-Z])/g, " $1").trim(),
-            shortCode: meta.shortCode || parts[1].slice(0, 2).toUpperCase(),
+            name: meta.name || folderName.replace(/([A-Z])/g, " $1").trim(),
+            shortCode: meta.shortCode || folderName.slice(0, 2).toUpperCase(),
             region: meta.region || parts[0].replace(/([A-Z])/g, " $1").trim(),
             lat: meta.lat ?? (42.755 + idx * 0.02),
             lng: meta.lng ?? (-70.858 - idx * 0.015),
-            color: meta.color || PALETTE[idx % PALETTE.length],
+            color: assignedColor,
             notes: meta.notes || "Continuous water quality monitoring station.",
             files: [],
             records: []
