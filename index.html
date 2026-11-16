@@ -3,233 +3,564 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Massachusetts Water Quality Dashboard</title>
+  <title>Massachusetts Coastal & River Water Quality</title>
+  <!-- Leaflet Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Plotly & PapaParse -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f4f7f9; color: #1e293b; }
-    header { background: #0f172a; color: #fff; padding: 1.25rem 2rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
-    header h1 { margin: 0; font-size: 1.25rem; }
-    .controls { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-    select { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #334155; font-size: 0.95rem; background: #1e293b; color: #fff; cursor: pointer; }
-    label.toggle { font-size: 0.88rem; display: flex; align-items: center; gap: 0.4rem; background: #1e293b; padding: 0.48rem 0.75rem; border-radius: 6px; border: 1px solid #334155; cursor: pointer; }
-    main { max-width: 1250px; margin: 2rem auto; padding: 0 1.5rem; }
-    .chart-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 1.25rem; margin-bottom: 1.5rem; }
-    .chart-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem; color: #0f172a; }
-    .chart-subtitle { font-size: 0.82rem; color: #64748b; margin-bottom: 0.75rem; }
-    .status { text-align: center; padding: 2rem; color: #64748b; }
+    :root {
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #0f172a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1180px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+    /* Hero Section */
+    .hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2.5rem; align-items: start; margin-bottom: 3.5rem; }
+    .hero h1 { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 0 0 1.25rem; }
+    .hero p { font-size: 1.05rem; color: #334155; margin: 0 0 2rem; max-width: 60ch; }
+    .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .kpi-box { border-top: 2px solid var(--text); padding-top: 0.75rem; }
+    .kpi-num { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+    .kpi-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+    .hero-aside { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.9rem; color: #475569; }
+    .hero-aside strong { color: var(--text); display: block; margin-bottom: 0.35rem; }
+
+    /* Section Headers & Pill Toggles */
+    section { margin-bottom: 4rem; }
+    .section-header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end;
+      gap: 1rem; padding-bottom: 1rem; border-bottom: 1.5px solid var(--text); margin-bottom: 1.5rem;
+    }
+    .section-header h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+    .section-header p { font-size: 0.92rem; color: var(--muted); margin: 0.2rem 0 0; }
+
+    .pill-group { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.42rem 0.9rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500;
+      border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pill:hover { border-color: #94a3b8; }
+    .pill.active { background: var(--text); color: #fff; border-color: var(--text); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+    /* Explore the Sites 2-Col Grid */
+    .explore-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.5rem; align-items: stretch; }
+    #map { height: 430px; border-radius: 12px; border: 1px solid var(--border); z-index: 1; }
+    .site-panel {
+      border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
+      display: flex; flex-direction: column; justify-content: space-between; background: #fff;
+    }
+    .site-card-item {
+      border: 1px solid var(--border); border-radius: 10px; padding: 0.95rem 1.1rem;
+      margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .site-card-item:hover { background: var(--surface); border-color: #94a3b8; }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; margin: 1.25rem 0; }
+    .metric-item .m-label { font-size: 0.8rem; color: var(--muted); }
+    .metric-item .m-val { font-size: 1.35rem; font-weight: 700; }
+    .metric-item .m-unit { font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+
+    /* Custom Map Marker */
+    .logger-pin {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%; background: #fff;
+      border: 2.5px solid #0284c7; font-size: 11px; font-weight: 700; color: #0f172a;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .logger-pin.selected { background: #0284c7; color: #fff; transform: scale(1.15); }
+
+    /* Time Series Section */
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+    .chart-box { border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; background: #fff; }
+    .chart-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+    .chart-header h3 { margin: 0; font-size: 1.15rem; }
+    .chart-header span { font-size: 0.85rem; color: var(--muted); }
+
+    @media (max-width: 860px) {
+      .hero, .explore-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>Massachusetts Water Quality</h1>
-  <div class="controls">
-    <select id="regionSelect"><option>Loading regions...</option></select>
-    <select id="riverSelect"><option>Loading rivers...</option></select>
-    <label class="toggle" title="Uses HOBO 'Water Detect' In/Out flags to exclude air readings">
-      <input type="checkbox" id="filterOutWater" checked />
-      Exclude "Out of Water" rows
-    </label>
-  </div>
-</header>
+<div class="container">
+  <!-- 1. Editorial Hero Header -->
+  <header class="hero">
+    <div>
+      <h1>Massachusetts Coastal Water Quality</h1>
+      <p>
+        Continuous high-frequency environmental monitoring across Massachusetts estuaries and tidal rivers.
+        We deploy submersible data loggers to track temperature, salinity, dissolved oxygen, pH, and tidal water levels
+        to understand estuarine dynamics and coastal ecosystem health.
+      </p>
+      <div class="kpi-row">
+        <div class="kpi-box">
+          <div class="kpi-num" id="kpiSites">—</div>
+          <div class="kpi-label">logger sites</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-num" id="kpiReadings">—</div>
+          <div class="kpi-label">verified readings</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-num" id="kpiLatestDate">—</div>
+          <div class="kpi-label">latest logger offload</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-aside">
+      <strong>About the Sensor Network</strong>
+      Submersible HOBO conductivity, dissolved oxygen, pH, and water level loggers record measurements every 15 minutes.
+      Out-of-water deployment intervals are automatically filtered using logger water-detect flags.
+      <div style="margin-top:0.85rem; padding-top:0.75rem; border-top:1px solid var(--border);">
+        <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-weight:500; color:var(--text);">
+          <input type="checkbox" id="filterOutWater" checked />
+          Exclude "Out of Water" readings
+        </label>
+      </div>
+    </div>
+  </header>
 
-<main id="dashboard">
-  <div class="status">Scanning repository for river data...</div>
-</main>
+  <!-- 2. Explore the Sites (Map + Site Details) -->
+  <section>
+    <div class="section-header">
+      <div>
+        <h2>Explore the sites</h2>
+        <p>Select a river station on the map or filter pills to inspect latest conditions.</p>
+      </div>
+      <div class="pill-group" id="sitePills"></div>
+    </div>
+
+    <div class="explore-grid">
+      <div id="map"></div>
+      <div class="site-panel" id="sitePanel">
+        <div style="color:var(--muted);">Loading site metadata and logger CSVs...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Through the Seasons (Interactive Multi-Metric & Multi-Site Plot) -->
+  <section>
+    <div class="section-header">
+      <div>
+        <h2>Through the seasons</h2>
+        <p>Compare water quality metrics across selected stations and time windows.</p>
+      </div>
+      <div class="pill-group" id="rangePills">
+        <button class="pill" data-days="7">Last 7 days</button>
+        <button class="pill" data-days="30">Last 30 days</button>
+        <button class="pill active" data-days="all">All data</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="pill-group" id="metricPills"></div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-header">
+        <h3 id="activeMetricTitle">Water Temperature</h3>
+        <span id="activeMetricUnit">Degrees Celsius (°C)</span>
+      </div>
+      <div id="mainChart" style="height: 410px;"></div>
+    </div>
+  </section>
+</div>
 
 <script>
   const OWNER = "GWLab-UML";
   const REPO = "Massachusetts_WaterQuality";
   const BRANCH = "main";
 
-  // Columns to ignore when plotting
-  const IGNORE_COLS = new Set(["#", "Host Connected", "End of File", "Started", "Water Detect"]);
+  const PALETTE = ["#0284c7", "#ea580c", "#059669", "#7c3aed", "#db2777", "#d97706"];
 
-  let repoIndex = {};
+  // Standardized metrics extracted from HOBO CSV headers
+  const METRIC_DEFS = [
+    { key: "temp", label: "Water Temperature", unit: "°C", match: h => h.startsWith("Temperature") },
+    { key: "salinity", label: "Salinity", unit: "PSU", match: h => h.includes("Salinity (PSU)") },
+    { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", match: h => h.includes("Salinity-Adjusted DO") },
+    { key: "do_meas", label: "Measured DO", unit: "mg/L", match: h => h.includes("Measured DO") },
+    { key: "sp_cond", label: "Specific Conductivity", unit: "µS/cm", match: h => h.includes("Specific Conductivity") },
+    { key: "ph", label: "pH", unit: "pH units", match: h => /^pH\b/i.test(h) },
+    { key: "level", label: "Water Level", unit: "m", match: h => h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
+  ];
 
-  async function init() {
-    const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
-    const data = await res.json();
+  let state = {
+    sites: {},          // { "PlumIslandSound/ParkerRiver": { name, lat, lng, color, rawFiles: [], rows: [] } }
+    selectedSite: "ALL",
+    selectedMetric: "temp",
+    rangeDays: "all",
+    map: null,
+    markers: {}
+  };
 
-    data.tree.forEach(item => {
-      if (item.type === "blob" && item.path.endsWith(".csv")) {
-        const parts = item.path.split("/");
-        if (parts.length >= 3) {
-          const [region, river] = parts;
-          repoIndex[region] = repoIndex[region] || {};
-          repoIndex[region][river] = repoIndex[region][river] || [];
-          repoIndex[region][river].push(item.path);
-        }
-      }
-    });
-
-    populateRegions();
-    document.getElementById("filterOutWater").onchange = () => {
-      renderRiver(
-        document.getElementById("regionSelect").value,
-        document.getElementById("riverSelect").value
-      );
-    };
-  }
-
-  function populateRegions() {
-    const regionSelect = document.getElementById("regionSelect");
-    const regions = Object.keys(repoIndex).sort();
-    regionSelect.innerHTML = regions.map(r => `<option value="${r}">${r.replace(/([A-Z])/g, ' $1').trim()}</option>`).join("");
-    regionSelect.onchange = () => populateRivers(regionSelect.value);
-    if (regions.length) populateRivers(regions[0]);
-  }
-
-  function populateRivers(region) {
-    const riverSelect = document.getElementById("riverSelect");
-    const rivers = Object.keys(repoIndex[region]).sort();
-    riverSelect.innerHTML = rivers.map(r => `<option value="${r}">${r.replace(/([A-Z])/g, ' $1').trim()}</option>`).join("");
-    riverSelect.onchange = () => renderRiver(region, riverSelect.value);
-    if (rivers.length) renderRiver(region, rivers[0]);
-  }
-
-  // Normalize HOBO header: collapse non-breaking spaces and remove logger serial tag e.g. (W-DO 22531020)
   function cleanHeader(raw) {
-    return raw
-      .replace(/\u00A0/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/\([A-Z0-9-]+\s+\d+\)/g, "")
-      .trim();
+    return raw.replace(/\u00A0/g, " ").replace(/\s+/g, " ").replace(/\([A-Z0-9-]+\s+\d+\)/g, "").trim();
   }
 
-  // Convert "6/12/2026 11:43" -> "2026-06-12 11:43" for Plotly time-series axis
   function parseHoboDate(str) {
     if (!str) return null;
-    const [datePart, timePart = "00:00"] = str.trim().split(" ");
+    const [datePart, timePart = "00:00"] = String(str).trim().split(" ");
     const [m, d, y] = datePart.split("/");
-    if (!y) return str;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")} ${timePart}`;
+    if (!y) return new Date(str);
+    return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timePart.padStart(5, "0")}:00`);
   }
 
-  async function renderRiver(region, river) {
-    const dashboard = document.getElementById("dashboard");
-    const files = repoIndex[region][river];
+  async function init() {
+    // 1. Load optional sites.json for coordinates/notes
+    let siteMeta = {};
+    try {
+      const metaRes = await fetch(`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/sites.json`);
+      if (metaRes.ok) siteMeta = await metaRes.json();
+    } catch (_) {}
+
+    // 2. Discover CSVs via GitHub Tree API
+    const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
+    const treeData = await treeRes.json();
+
+    const csvPaths = treeData.tree
+      .filter(item => item.type === "blob" && item.path.endsWith(".csv"))
+      .map(item => item.path);
+
+    // Group by Region/River
+    let idx = 0;
+    for (const path of csvPaths) {
+      const parts = path.split("/");
+      if (parts.length < 3) continue;
+      const siteKey = `${parts[0]}/${parts[1]}`;
+      if (!state.sites[siteKey]) {
+        const meta = siteMeta[siteKey] || {};
+        state.sites[siteKey] = {
+          key: siteKey,
+          name: meta.name || parts[1].replace(/([A-Z])/g, " $1").trim(),
+          shortCode: meta.shortCode || parts[1].slice(0, 2).toUpperCase(),
+          region: meta.region || parts[0].replace(/([A-Z])/g, " $1").trim(),
+          lat: meta.lat ?? (42.755 + idx * 0.02),
+          lng: meta.lng ?? (-70.858 - idx * 0.015),
+          color: meta.color || PALETTE[idx % PALETTE.length],
+          notes: meta.notes || "Continuous water quality monitoring station.",
+          files: [],
+          records: [] // unified time-sorted objects
+        };
+        idx++;
+      }
+      state.sites[siteKey].files.push(path);
+    }
+
+    initMap();
+    await loadAllCSVData();
+    setupControls();
+    renderAll();
+  }
+
+  function initMap() {
+    state.map = L.map("map", { scrollWheelZoom: false }).setView([42.76, -70.85], 12);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 18
+    }).addTo(state.map);
+
+    const bounds = [];
+    Object.values(state.sites).forEach(site => {
+      bounds.push([site.lat, site.lng]);
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="logger-pin" id="pin-${site.key.replace('/', '-')}" style="border-color:${site.color}">${site.shortCode}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      const marker = L.marker([site.lat, site.lng], { icon }).addTo(state.map);
+      marker.on("click", () => {
+        state.selectedSite = (state.selectedSite === site.key) ? "ALL" : site.key;
+        renderAll();
+      });
+      state.markers[site.key] = marker;
+    });
+
+    if (bounds.length === 1) state.map.setView(bounds[0], 13);
+    else if (bounds.length > 1) state.map.fitBounds(bounds, { padding: [50, 50] });
+  }
+
+  async function loadAllCSVData() {
     const excludeOut = document.getElementById("filterOutWater").checked;
 
-    dashboard.innerHTML = "";
+    for (const site of Object.values(state.sites)) {
+      const timeMap = new Map(); // timestamp ms -> { date, metrics... }
 
-    for (const filePath of files) {
-      const fileName = filePath.split("/").pop();
-      const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
+      for (const filePath of site.files) {
+        const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
+        const rows = await new Promise(resolve => {
+          Papa.parse(url, {
+            download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+            complete: res => resolve(res.data)
+          });
+        });
 
-      Papa.parse(rawUrl, {
-        download: true,
-        header: true,
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        complete: (results) => processAndPlotFile(fileName, results.data, results.meta.fields, excludeOut, dashboard)
-      });
+        if (!rows.length) continue;
+        const rawFields = Object.keys(rows[0]);
+        const dateCol = rawFields.find(f => f.toLowerCase().includes("date-time")) || rawFields[1];
+        const waterDetectCol = rawFields.find(f => cleanHeader(f) === "Water Detect");
+
+        // Map raw columns to standardized METRIC_DEFS
+        const colMapping = [];
+        rawFields.forEach(rc => {
+          const clean = cleanHeader(rc);
+          const def = METRIC_DEFS.find(m => m.match(clean));
+          if (def && !colMapping.some(c => c.key === def.key)) {
+            colMapping.push({ rawCol: rc, key: def.key });
+          }
+        });
+
+        let currentlyOut = false;
+        for (const r of rows) {
+          if (waterDetectCol && r[waterDetectCol]) {
+            const flag = String(r[waterDetectCol]).trim().toLowerCase();
+            if (flag === "out") currentlyOut = true;
+            if (flag === "in") currentlyOut = false;
+          }
+          if (excludeOut && currentlyOut) continue;
+
+          const dt = parseHoboDate(r[dateCol]);
+          if (!dt || isNaN(dt.getTime())) continue;
+
+          const tKey = dt.getTime();
+          if (!timeMap.has(tKey)) timeMap.set(tKey, { date: dt });
+          const entry = timeMap.get(tKey);
+
+          colMapping.forEach(({ rawCol, key }) => {
+            if (typeof r[rawCol] === "number") entry[key] = r[rawCol];
+          });
+        }
+      }
+
+      site.records = Array.from(timeMap.values()).sort((a, b) => a.date - b.date);
     }
   }
 
-  function processAndPlotFile(fileName, rows, rawFields, excludeOut, container) {
-    if (!rows.length) return;
+  function setupControls() {
+    document.getElementById("filterOutWater").onchange = async () => {
+      await loadAllCSVData();
+      renderAll();
+    };
 
-    // Identify Date-Time column and Water Detect column
-    const dateCol = rawFields.find(f => f.toLowerCase().includes("date-time")) || rawFields[1];
-    const waterDetectCol = rawFields.find(f => cleanHeader(f) === "Water Detect");
-
-    // Track in-water state across sparse HOBO event rows ("Out" -> "In")
-    let currentlyOut = false;
-    const filteredRows = rows.filter(row => {
-      if (waterDetectCol && row[waterDetectCol]) {
-        const flag = String(row[waterDetectCol]).trim().toLowerCase();
-        if (flag === "out") currentlyOut = true;
-        if (flag === "in") currentlyOut = false;
-      }
-      return excludeOut ? !currentlyOut : true;
+    // Range pills
+    document.querySelectorAll("#rangePills .pill").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll("#rangePills .pill").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.rangeDays = btn.dataset.days;
+        renderChart();
+      };
     });
 
-    const timestamps = filteredRows.map(r => parseHoboDate(r[dateCol]));
+    // Metric pills (only show metrics present in the data)
+    const availableKeys = new Set();
+    Object.values(state.sites).forEach(s => s.records.forEach(r => Object.keys(r).forEach(k => availableKeys.add(k))));
+    const availableMetrics = METRIC_DEFS.filter(m => availableKeys.has(m.key));
+    if (availableMetrics.length && !availableKeys.has(state.selectedMetric)) {
+      state.selectedMetric = availableMetrics[0].key;
+    }
 
-    // Build cleaned numeric series
-    const series = [];
-    rawFields.forEach(rawCol => {
-      const label = cleanHeader(rawCol);
-      if (rawCol === dateCol || IGNORE_COLS.has(label)) return;
+    const metricPills = document.getElementById("metricPills");
+    metricPills.innerHTML = availableMetrics.map(m =>
+      `<button class="pill ${m.key === state.selectedMetric ? "active" : ""}" data-metric="${m.key}">${m.label}</button>`
+    ).join("");
 
-      const values = filteredRows.map(r => (typeof r[rawCol] === "number" ? r[rawCol] : null));
-      if (values.some(v => v !== null)) {
-        series.push({ rawCol, label, values });
+    metricPills.querySelectorAll(".pill").forEach(btn => {
+      btn.onclick = () => {
+        metricPills.querySelectorAll(".pill").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.selectedMetric = btn.dataset.metric;
+        renderChart();
+      };
+    });
+  }
+
+  function renderAll() {
+    renderKPIs();
+    renderSitePills();
+    renderSitePanel();
+    updateMapPins();
+    renderChart();
+  }
+
+  function renderKPIs() {
+    const sites = Object.values(state.sites);
+    const totalReadings = sites.reduce((sum, s) => sum + s.records.length, 0);
+    let latest = null;
+    sites.forEach(s => {
+      if (s.records.length) {
+        const d = s.records[s.records.length - 1].date;
+        if (!latest || d > latest) latest = d;
       }
     });
 
-    // If this is a combined Salinity + DO file, split into two clean dual-axis cards
-    const hasDO = series.some(s => s.label.includes("DO"));
-    const hasSalinity = series.some(s => s.label.includes("Salinity (PSU)"));
+    document.getElementById("kpiSites").textContent = sites.length;
+    document.getElementById("kpiReadings").textContent = totalReadings.toLocaleString();
+    document.getElementById("kpiLatestDate").textContent = latest
+      ? latest.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : "—";
+  }
 
-    if (hasDO && hasSalinity) {
-      // Card 1: Dissolved Oxygen (mg/L) + Water Temperature (°C)
-      const doSeries = series.filter(s => s.label.includes("DO"));
-      const tempSeries = series.filter(s => s.label.startsWith("Temperature")).slice(0, 1); // primary temp sensor
-      createDualAxisCard(
-        container,
-        `${fileName} — Dissolved Oxygen & Temperature`,
-        `${filteredRows.length.toLocaleString()} readings`,
-        timestamps,
-        doSeries, "Dissolved Oxygen (mg/L)",
-        tempSeries, "Temperature (°C)"
-      );
+  function renderSitePills() {
+    const container = document.getElementById("sitePills");
+    const sites = Object.values(state.sites);
+    let html = `<button class="pill ${state.selectedSite === "ALL" ? "active" : ""}" data-site="ALL">All sites</button>`;
+    sites.forEach(s => {
+      const active = state.selectedSite === s.key ? "active" : "";
+      html += `<button class="pill ${active}" data-site="${s.key}">
+        <span class="dot" style="background:${s.color}"></span>${s.name}
+      </button>`;
+    });
+    container.innerHTML = html;
 
-      // Card 2: Salinity (PSU) + Specific Conductivity (µS/cm)
-      const salSeries = series.filter(s => s.label.includes("Salinity (PSU)"));
-      const condSeries = series.filter(s => s.label.includes("Specific Conductivity"));
-      createDualAxisCard(
-        container,
-        `${fileName} — Salinity & Specific Conductivity`,
-        `${filteredRows.length.toLocaleString()} readings`,
-        timestamps,
-        salSeries, "Salinity (PSU)",
-        condSeries, "Specific Conductivity (µS/cm)"
-      );
+    container.querySelectorAll(".pill").forEach(btn => {
+      btn.onclick = () => {
+        state.selectedSite = btn.dataset.site;
+        renderAll();
+      };
+    });
+  }
+
+  function updateMapPins() {
+    Object.values(state.sites).forEach(s => {
+      const el = document.getElementById(`pin-${s.key.replace("/", "-")}`);
+      if (!el) return;
+      if (state.selectedSite === s.key) {
+        el.classList.add("selected");
+        el.style.background = s.color;
+      } else {
+        el.classList.remove("selected");
+        el.style.background = "#fff";
+      }
+    });
+  }
+
+  function renderSitePanel() {
+    const panel = document.getElementById("sitePanel");
+    const sites = Object.values(state.sites);
+
+    if (state.selectedSite === "ALL") {
+      const latestGlobal = sites.map(s => s.records.at(-1)?.date).filter(Boolean).sort((a, b) => b - a)[0];
+      const dateStr = latestGlobal ? latestGlobal.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
+
+      panel.innerHTML = `
+        <div>
+          <h3 style="margin:0 0 0.2rem;">All monitoring sites</h3>
+          <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1.1rem;">Most recent reading ${dateStr}</div>
+          ${sites.map(s => {
+            const last = s.records.at(-1) || {};
+            const temp = last.temp != null ? `${last.temp.toFixed(1)}°` : "—";
+            const sal = last.salinity != null ? `Salinity: ${last.salinity.toFixed(1)} PSU` : `${s.files.length} datasets`;
+            return `
+              <div class="site-card-item" style="border-left: 4px solid ${s.color}" onclick="state.selectedSite='${s.key}'; renderAll();">
+                <div>
+                  <div style="font-weight:700;">${s.name}</div>
+                  <div style="font-size:0.83rem; color:var(--muted);">${sal} · ${s.records.length.toLocaleString()} pts</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:1.35rem; font-weight:700;">${temp}</div>
+                  <div style="font-size:0.75rem; color:var(--muted);">water °C</div>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+        <div style="font-size:0.82rem; color:var(--muted);">Click any station card or map marker to view full sensor details.</div>
+      `;
     } else {
-      // Standard single-card plot (e.g., pH or Water Level)
-      createSingleAxisCard(container, fileName, `${filteredRows.length.toLocaleString()} readings`, timestamps, series);
+      const s = state.sites[state.selectedSite];
+      const last = s.records.at(-1) || {};
+      const dateStr = last.date ? last.date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—";
+      const fmt = (v, d = 1) => (v != null ? v.toFixed(d) : "—");
+
+      panel.innerHTML = `
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span class="dot" style="background:${s.color}; width:10px; height:10px;"></span>
+              <h3 style="margin:0;">${s.name}</h3>
+            </div>
+            <a href="#" onclick="event.preventDefault(); state.selectedSite='ALL'; renderAll();" style="font-size:0.85rem; color:var(--text);">All sites</a>
+          </div>
+          <div style="font-size:0.85rem; color:var(--muted); margin-top:0.2rem;">Last sampled ${dateStr} · ${s.records.length.toLocaleString()} readings</div>
+
+          <div class="metric-grid">
+            <div class="metric-item"><div class="m-label">Water temperature</div><div class="m-val">${fmt(last.temp)} <span class="m-unit">°C</span></div></div>
+            <div class="metric-item"><div class="m-label">Salinity</div><div class="m-val">${fmt(last.salinity)} <span class="m-unit">PSU</span></div></div>
+            <div class="metric-item"><div class="m-label">Salinity-adjusted DO</div><div class="m-val">${fmt(last.do_adj, 2)} <span class="m-unit">mg/L</span></div></div>
+            <div class="metric-item"><div class="m-label">Specific conductivity</div><div class="m-val">${last.sp_cond != null ? Math.round(last.sp_cond).toLocaleString() : "—"} <span class="m-unit">µS/cm</span></div></div>
+            <div class="metric-item"><div class="m-label">pH</div><div class="m-val">${fmt(last.ph, 2)}</div></div>
+            <div class="metric-item"><div class="m-label">Water level</div><div class="m-val">${fmt(last.level, 2)} <span class="m-unit">m</span></div></div>
+          </div>
+
+          <div style="border-top:1px solid var(--border); padding-top:0.85rem;">
+            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Station notes</div>
+            <div style="font-size:0.88rem; color:#475569;">${s.notes}</div>
+          </div>
+        </div>
+      `;
     }
   }
 
-  function createDualAxisCard(container, title, subtitle, x, leftSeries, leftTitle, rightSeries, rightTitle) {
-    const id = "plot-" + Math.random().toString(36).slice(2, 9);
-    const card = document.createElement("div");
-    card.className = "chart-card";
-    card.innerHTML = `<div class="chart-title">${title}</div><div class="chart-subtitle">${subtitle}</div><div id="${id}" style="height:380px;"></div>`;
-    container.appendChild(card);
+  function renderChart() {
+    const metricDef = METRIC_DEFS.find(m => m.key === state.selectedMetric) || METRIC_DEFS[0];
+    document.getElementById("activeMetricTitle").textContent = metricDef.label;
+    document.getElementById("activeMetricUnit").textContent = metricDef.unit;
 
-    const traces = [
-      ...leftSeries.map(s => ({ x, y: s.values, name: s.label, type: "scatter", mode: "lines", yaxis: "y" })),
-      ...rightSeries.map(s => ({ x, y: s.values, name: s.label, type: "scatter", mode: "lines", yaxis: "y2", line: { dash: "dot" } }))
-    ];
+    const sitesToPlot = state.selectedSite === "ALL"
+      ? Object.values(state.sites)
+      : [state.sites[state.selectedSite]];
 
-    Plotly.newPlot(id, traces, {
-      margin: { t: 15, r: 65, b: 40, l: 60 },
-      xaxis: { rangeslider: { visible: true } },
-      yaxis: { title: leftTitle },
-      yaxis2: { title: rightTitle, overlaying: "y", side: "right", showgrid: false },
+    const traces = sitesToPlot.map(site => {
+      let pts = site.records.filter(r => r[metricDef.key] != null);
+
+      if (state.rangeDays !== "all" && pts.length) {
+        const cutoff = new Date(pts[pts.length - 1].date.getTime() - Number(state.rangeDays) * 86400000);
+        pts = pts.filter(r => r.date >= cutoff);
+      }
+
+      // Downsample if > 2,500 points so browser stays snappy
+      const step = Math.max(1, Math.floor(pts.length / 2500));
+      const sampled = pts.filter((_, i) => i % step === 0);
+
+      return {
+        x: sampled.map(r => r.date),
+        y: sampled.map(r => r[metricDef.key]),
+        name: site.name,
+        type: "scatter",
+        mode: "lines",
+        line: { color: site.color, width: 2 }
+      };
+    });
+
+    Plotly.newPlot("mainChart", traces, {
+      margin: { t: 10, r: 25, b: 40, l: 55 },
+      xaxis: { showgrid: false, linecolor: "#cbd5e1" },
+      yaxis: { title: metricDef.unit, gridcolor: "#f1f5f9", zeroline: false },
       hovermode: "x unified",
-      legend: { orientation: "h", y: 1.12 }
-    }, { responsive: true });
-  }
-
-  function createSingleAxisCard(container, title, subtitle, x, seriesList) {
-    const id = "plot-" + Math.random().toString(36).slice(2, 9);
-    const card = document.createElement("div");
-    card.className = "chart-card";
-    card.innerHTML = `<div class="chart-title">${title}</div><div class="chart-subtitle">${subtitle}</div><div id="${id}" style="height:360px;"></div>`;
-    container.appendChild(card);
-
-    const traces = seriesList.map(s => ({ x, y: s.values, name: s.label, type: "scatter", mode: "lines" }));
-
-    Plotly.newPlot(id, traces, {
-      margin: { t: 15, r: 30, b: 40, l: 60 },
-      xaxis: { rangeslider: { visible: true } },
-      hovermode: "x unified",
-      legend: { orientation: "h", y: 1.12 }
+      legend: { orientation: "h", y: 1.08 },
+      plot_bgcolor: "#ffffff",
+      paper_bgcolor: "#ffffff"
     }, { responsive: true });
   }
 
