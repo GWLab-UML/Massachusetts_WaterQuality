@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Massachusetts Coastal & River Water Quality</title>
+  <title>Massachusetts Coastal Water Quality</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -110,7 +110,7 @@
       <h1>Massachusetts Coastal Water Quality</h1>
       <p>
         Continuous high-frequency environmental monitoring across Massachusetts estuaries and tidal rivers.
-        We deploy submersible data loggers to track temperature, salinity, dissolved oxygen, pH, and tidal water levels
+        We deploy submersible HOBO data loggers to track temperature, salinity, dissolved oxygen, pH, and tidal water levels
         to understand estuarine dynamics and coastal ecosystem health.
       </p>
       <div class="kpi-row">
@@ -145,7 +145,7 @@
     <div class="section-header">
       <div>
         <h2>Explore the sites</h2>
-        <p>Select a river station on the map or filter pills to inspect average conditions.</p>
+        <p>Select a site on the map or filter pills to inspect average conditions.</p>
       </div>
       <div class="pill-group" id="sitePills"></div>
     </div>
@@ -161,8 +161,8 @@
   <section>
     <div class="section-header">
       <div>
-        <h2>Through the seasons</h2>
-        <p>Compare water quality metrics across selected stations and time windows.</p>
+        <h2>Water chemistry over time</h2>
+        <p>Compare water quality metrics across selected sites and time windows.</p>
       </div>
       <div class="pill-group" id="rangePills">
         <button class="pill" data-days="7">Last 7 days</button>
@@ -194,8 +194,8 @@
   // Explicit color overrides for known sites, with fallback palette
   const SITE_COLORS = {
     "ParkerRiver": "#240046",
-    "Mudcreek": "#E63946",
-    "RowleyRiver": "#FFBE0B"
+    "Mudcreek": "#FFBE0B",
+    "RowleyRiver": "#E63946"
   };
   const FALLBACK_PALETTE = ["#240046", "#E63946", "#FFBE0B", "#1d3557", "#457b9d", "#2a9d8f"];
 
