@@ -27,8 +27,12 @@
     }
     .container { max-width: 1180px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
 
+    /* Header & Logo Layout */
+    .header-branding { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.25rem; }
+    .lab-logo { height: 64px; width: auto; object-fit: contain; }
+
     .hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2.5rem; align-items: start; margin-bottom: 3.5rem; }
-    .hero h1 { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 0 0 1.25rem; }
+    .hero h1 { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 0; }
     .hero p { font-size: 1.05rem; color: #334155; margin: 0 0 2rem; max-width: 60ch; }
     .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
     .kpi-box { border-top: 2px solid var(--text); padding-top: 0.75rem; }
@@ -97,6 +101,14 @@
     .chart-header h3 { margin: 0; font-size: 1.15rem; }
     .chart-header span { font-size: 0.85rem; color: var(--muted); }
 
+    /* Footer Styles */
+    .site-footer {
+      margin-top: 5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      font-size: 0.85rem; color: var(--muted); gap: 1rem;
+    }
+    .site-footer a { color: var(--text); text-decoration: underline; font-weight: 500; }
+
     @media (max-width: 860px) {
       .hero, .explore-grid { grid-template-columns: 1fr; }
     }
@@ -107,7 +119,10 @@
 <div class="container">
   <header class="hero">
     <div>
-      <h1>Massachusetts Coastal Water Quality</h1>
+      <div class="header-branding">
+        <img src="lab_logo.png" alt="GW Lab Logo" class="lab-logo" />
+        <h1>Massachusetts Coastal Water Quality</h1>
+      </div>
       <p>
         Continuous high-frequency environmental monitoring across Massachusetts estuaries and tidal rivers.
         We deploy submersible HOBO data loggers to track temperature, salinity, dissolved oxygen, pH, and tidal water levels
@@ -183,6 +198,11 @@
       <div id="mainChart" style="height: 410px;"></div>
     </div>
   </section>
+
+  <footer class="site-footer">
+    <div>Built collaboratively with Gemini.</div>
+    <div>Raw data repository: <a href="https://github.com/GWLab-UML/Massachusetts_WaterQuality" target="_blank">GitHub / Massachusetts_WaterQuality</a></div>
+  </footer>
 </div>
 
 <script>
@@ -191,7 +211,6 @@
   const BRANCH = "main";
   const CARTO_KEY = "cb1_5adm_1_adff386630b870a13660b8f1";
 
-  // Your custom color assignments
   const SITE_COLORS = {
     "parkerriver": "#7B2FF7",
     "mudcreek": "#00C2FF",
@@ -204,7 +223,6 @@
     { key: "salinity", label: "Salinity", unit: "PSU", match: h => h.includes("Salinity (PSU)") },
     { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", match: h => h.includes("Salinity-Adjusted DO") },
     { key: "do_meas", label: "Measured DO", unit: "mg/L", match: h => h.includes("Measured DO") },
-    { key: "sp_cond", label: "Specific Conductivity", unit: "µS/cm", match: h => h.includes("Specific Conductivity") },
     { key: "ph", label: "pH", unit: "pH units", match: h => /^pH\b/i.test(h) },
     { key: "level", label: "Water Level", unit: "m", match: h => h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
   ];
@@ -233,7 +251,7 @@
 
   function cToF(c) {
     if (c == null || isNaN(c)) return null;
-    return c > 50 ? c : (c * 9/5) + 32;
+    return (c * 9/5) + 32;
   }
 
   function calcMean(records, key) {
@@ -295,6 +313,7 @@
             lat: meta.lat ?? (42.755 + idx * 0.02),
             lng: meta.lng ?? (-70.858 - idx * 0.015),
             color: assignedColor,
+            notes: meta.notes || "Continuous water quality monitoring station.",
             files: [],
             records: []
           };
@@ -532,7 +551,7 @@
               </div>`;
           }).join("")}
         </div>
-        <div style="font-size:0.82rem; color:var(--muted);">Click any site card or map marker to view monthly & all-time averages.</div>
+        <div style="font-size:0.82rem; color:var(--muted);">Click any station card or map marker to view monthly & all-time averages.</div>
       `;
     } else {
       const s = state.sites[state.selectedSite];
@@ -584,14 +603,12 @@
           <div class="metric-grid">
             <div class="metric-item"><div class="m-label">Avg water temperature</div><div class="m-val">${fmtMean("temp", 1)} <span class="m-unit">°F</span></div></div>
             <div class="metric-item"><div class="m-label">Avg salinity</div><div class="m-val">${fmtMean("salinity", 1)} <span class="m-unit">PSU</span></div></div>
-            <div class="metric-item"><div class="m-label">Avg salinity-adjusted DO</div><div class="m-val">${fmtMean("do_adj", 2)} <span class="m-unit">mg/L</span></div></div>
-            <div class="metric-item"><div class="m-label">Avg specific conductivity</div><div class="m-val">${fmtMean("sp_cond", 0, true)} <span class="m-unit">µS/cm</span></div></div>
+            <div class="metric-item"><div class="m-label">Avg dissolved oxygen</div><div class="m-val">${fmtMean("do_adj", 2)} <span class="m-unit">mg/L</span></div></div>
             <div class="metric-item"><div class="m-label">Avg pH</div><div class="m-val">${fmtMean("ph", 2)}</div></div>
-            <div class="metric-item"><div class="m-label">Avg water level</div><div class="m-val">${fmtMean("level", 2)} <span class="m-unit">m</span></div></div>
           </div>
 
           <div style="border-top:1px solid var(--border); padding-top:0.85rem;">
-            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;"></div>
+            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Station notes</div>
             <div style="font-size:0.88rem; color:#475569;">${s.notes}</div>
           </div>
         </div>
