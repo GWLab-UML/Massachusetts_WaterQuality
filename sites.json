@@ -5,7 +5,7 @@
     "region": "Plum Island Sound",
     "lat": 42.76357,
     "lng": -70.85529,
-    "color": "#0284c7"
+    "color": "#240046"
   },
   "PlumIslandSound/RowleyRiver": {
     "name": "Rowley River",
@@ -13,7 +13,7 @@
     "region": "Plum Island Sound",
     "lat": 42.725893,
     "lng": -70.848708,
-    "color": "#ea580c"
+    "color": "#E63946"
   },
   "PlumIslandSound/Mudcreek": {
     "name": "Mudcreek",
@@ -21,6 +21,6 @@
     "region": "Plum Island Sound",
     "lat": 42.75112,
     "lng": -70.83723,
-    "color": "#059669"
+    "color": "#FFBE0B"
   }
 }
