@@ -27,7 +27,6 @@
     }
     .container { max-width: 1180px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
 
-    /* Header & Logo Layout */
     .header-branding { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.25rem; }
     .lab-logo { height: 64px; width: auto; object-fit: contain; }
 
@@ -101,7 +100,6 @@
     .chart-header h3 { margin: 0; font-size: 1.15rem; }
     .chart-header span { font-size: 0.85rem; color: var(--muted); }
 
-    /* Footer Styles */
     .site-footer {
       margin-top: 5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
       display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
@@ -249,6 +247,7 @@
     return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timePart.padStart(5, "0")}:00`);
   }
 
+  // Convert Celsius to Fahrenheit safely (handles raw C values around 0-35)
   function cToF(c) {
     if (c == null || isNaN(c)) return null;
     return (c * 9/5) + 32;
@@ -257,8 +256,7 @@
   function calcMean(records, key) {
     let sum = 0, count = 0;
     for (const r of records) {
-      let val = r[key];
-      if (key === "temp") val = cToF(val);
+      const val = r[key];
       if (typeof val === "number" && !isNaN(val)) {
         sum += val;
         count++;
@@ -313,7 +311,6 @@
             lat: meta.lat ?? (42.755 + idx * 0.02),
             lng: meta.lng ?? (-70.858 - idx * 0.015),
             color: assignedColor,
-            notes: meta.notes || "Continuous water quality monitoring station.",
             files: [],
             records: []
           };
@@ -410,7 +407,10 @@
           const entry = timeMap.get(tKey);
 
           colMapping.forEach(({ rawCol, key }) => {
-            if (typeof r[rawCol] === "number") entry[key] = r[rawCol];
+            if (typeof r[rawCol] === "number") {
+              // Normalize temperature to Fahrenheit right upon ingestion
+              entry[key] = (key === "temp") ? cToF(r[rawCol]) : r[rawCol];
+            }
           });
         }
       }
@@ -530,10 +530,9 @@
           <h3 style="margin:0 0 0.2rem;">All monitoring sites</h3>
           <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1.1rem;">Overall averages · Data through ${dateStr}</div>
           ${sites.map(s => {
-            const avgTempC = calcMean(s.records, "temp");
-            const avgTempF = cToF(avgTempC);
+            const avgTemp = calcMean(s.records, "temp");
             const avgSal = calcMean(s.records, "salinity");
-            const tempStr = avgTempF != null ? `${avgTempF.toFixed(1)}°` : "—";
+            const tempStr = avgTemp != null ? `${avgTemp.toFixed(1)}°` : "—";
             const subStr = avgSal != null
               ? `Avg salinity: ${avgSal.toFixed(1)} PSU · ${s.records.length.toLocaleString()} pts`
               : `${s.files.length} datasets · ${s.records.length.toLocaleString()} pts`;
@@ -569,9 +568,8 @@
           });
 
       const fmtMean = (key, d = 1, roundInt = false) => {
-        let val = calcMean(filteredRecords, key);
+        const val = calcMean(filteredRecords, key);
         if (val == null) return "—";
-        if (key === "temp") val = cToF(val);
         return roundInt ? Math.round(val).toLocaleString() : val.toFixed(d);
       };
 
@@ -606,11 +604,6 @@
             <div class="metric-item"><div class="m-label">Avg dissolved oxygen</div><div class="m-val">${fmtMean("do_adj", 2)} <span class="m-unit">mg/L</span></div></div>
             <div class="metric-item"><div class="m-label">Avg pH</div><div class="m-val">${fmtMean("ph", 2)}</div></div>
           </div>
-
-          <div style="border-top:1px solid var(--border); padding-top:0.85rem;">
-            <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Station notes</div>
-            <div style="font-size:0.88rem; color:#475569;">${s.notes}</div>
-          </div>
         </div>
       `;
 
@@ -641,15 +634,9 @@
       const step = Math.max(1, Math.floor(pts.length / 2500));
       const sampled = pts.filter((_, i) => i % step === 0);
 
-      const yValues = sampled.map(r => {
-        let val = r[metricDef.key];
-        if (metricDef.key === "temp") val = cToF(val);
-        return val;
-      });
-
       return {
         x: sampled.map(r => r.date),
-        y: yValues,
+        y: sampled.map(r => r[metricDef.key]),
         name: site.name,
         type: "scatter",
         mode: "lines",
