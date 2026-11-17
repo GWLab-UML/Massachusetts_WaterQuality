@@ -185,7 +185,7 @@
 
       <div class="funding-note">
         <img src="funding_logo.png" alt="Massachusetts Department of Fish and Game Logo" class="funding-logo" onerror="this.style.display='none'" />
-        <div>These HOBOs were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
+        <div>A subset of these HOBOs were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
       </div>
     </div>
   </header>
@@ -298,10 +298,13 @@
 
   function parseHoboDate(str) {
     if (!str) return null;
-    const [datePart, timePart = "00:00"] = String(str).trim().split(" ");
+    const parts = String(str).trim().split(" ");
+    const datePart = parts[0];
+    const timePart = parts[1] || "00:00:00";
     const [m, d, y] = datePart.split("/");
     if (!y) return new Date(str);
-    return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timePart.padStart(5, "0")}:00`);
+    const timeClean = timePart.includes(":") && timePart.split(":").length === 2 ? `${timePart}:00` : timePart;
+    return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${timeClean}`);
   }
 
   function cToF(c) {
@@ -321,6 +324,10 @@
     return count > 0 ? sum / count : null;
   }
 
+  function getSortedSites() {
+    return Object.values(state.sites).sort((a, b) => b.lat - a.lat);
+  }
+
   function getAvailableMonths(records) {
     const map = new Map();
     for (const r of records) {
@@ -334,7 +341,7 @@
 
   function getAllAvailableMonthsAcrossSites() {
     const map = new Map();
-    Object.values(state.sites).forEach(site => {
+    getSortedSites().forEach(site => {
       site.records.forEach(r => {
         const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
         if (!map.has(ym)) {
@@ -358,7 +365,7 @@
       const treeData = await treeRes.json();
 
       const csvPaths = treeData.tree
-        .filter(item => item.type === "blob" && item.path.endsWith(".csv"))
+        .filter(item => item.type === "blob" && item.path.endsWith(".csv") && !item.path.toLowerCase().includes("barometric"))
         .map(item => item.path);
 
       let idx = 0;
@@ -407,7 +414,7 @@
     }).addTo(state.map);
 
     const bounds = [];
-    Object.values(state.sites).forEach(site => {
+    getSortedSites().forEach(site => {
       bounds.push([site.lat, site.lng]);
       const icon = L.divIcon({
         className: "",
@@ -436,7 +443,7 @@
       const timeMap = new Map();
 
       for (const filePath of site.files) {
-        const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${filePath}`;
+        const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURI(filePath)}`;
         const rows = await new Promise(resolve => {
           Papa.parse(url, {
             download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
@@ -447,7 +454,7 @@
 
         if (!rows.length) continue;
         const rawFields = Object.keys(rows[0]);
-        const dateCol = rawFields.find(f => f.toLowerCase().includes("date-time")) || rawFields[1];
+        const dateCol = rawFields.find(f => f.toLowerCase().includes("date")) || rawFields[1];
         const waterDetectCol = rawFields.find(f => cleanHeader(f) === "Water Detect");
 
         const colMapping = [];
@@ -460,13 +467,15 @@
         });
 
         let currentlyOut = false;
+        const hasInFlag = waterDetectCol && rows.some(r => String(r[waterDetectCol] || "").trim().toLowerCase() === "in");
+
         for (const r of rows) {
           if (waterDetectCol && r[waterDetectCol]) {
             const flag = String(r[waterDetectCol]).trim().toLowerCase();
             if (flag === "out") currentlyOut = true;
             if (flag === "in") currentlyOut = false;
           }
-          if (excludeOut && currentlyOut) continue;
+          if (excludeOut && hasInFlag && currentlyOut) continue;
 
           const dt = parseHoboDate(r[dateCol]);
           if (!dt || isNaN(dt.getTime())) continue;
@@ -497,7 +506,7 @@
     updateChartPeriodDropdown();
 
     const availableKeys = new Set();
-    Object.values(state.sites).forEach(s => s.records.forEach(r => Object.keys(r).forEach(k => availableKeys.add(k))));
+    getSortedSites().forEach(s => s.records.forEach(r => Object.keys(r).forEach(k => availableKeys.add(k))));
     const availableMetrics = METRIC_DEFS.filter(m => availableKeys.has(m.key));
     if (availableMetrics.length && !availableKeys.has(state.selectedMetric)) {
       state.selectedMetric = availableMetrics[0].key;
@@ -543,7 +552,7 @@
   }
 
   function renderKPIs() {
-    const sites = Object.values(state.sites);
+    const sites = getSortedSites();
     const totalReadings = sites.reduce((sum, s) => sum + s.records.length, 0);
     let latest = null;
     sites.forEach(s => {
@@ -562,7 +571,7 @@
 
   function renderSitePills() {
     const container = document.getElementById("sitePills");
-    const sites = Object.values(state.sites);
+    const sites = getSortedSites();
     let html = `<button class="pill ${state.selectedSite === "ALL" ? "active" : ""}" data-site="ALL">All sites</button>`;
     sites.forEach(s => {
       const active = state.selectedSite === s.key ? "active" : "";
@@ -582,7 +591,7 @@
   }
 
   function updateMapPins() {
-    Object.values(state.sites).forEach(s => {
+    getSortedSites().forEach(s => {
       const el = document.getElementById(`pin-${s.key.replace("/", "-")}`);
       if (!el) return;
       if (state.selectedSite === s.key) {
@@ -597,7 +606,7 @@
 
   function renderSitePanel() {
     const panel = document.getElementById("sitePanel");
-    const sites = Object.values(state.sites);
+    const sites = getSortedSites();
 
     if (state.selectedSite === "ALL") {
       const latestGlobal = sites.map(s => s.records.at(-1)?.date).filter(Boolean).sort((a, b) => b - a)[0];
@@ -605,7 +614,7 @@
 
       panel.innerHTML = `
         <div>
-          <h3 style="margin:0 0 0.2rem;">All monitoring sites</h3>
+          <h3 style="margin:0 0 0.2rem;">All monitoring sites (North to South)</h3>
           <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1.1rem;">Overall averages · Data through ${dateStr}</div>
           ${sites.map(s => {
             const avgTemp = calcMean(s.records, "temp");
@@ -698,7 +707,7 @@
     document.getElementById("activeMetricUnit").textContent = metricDef.unit;
 
     const sitesToPlot = state.selectedSite === "ALL"
-      ? Object.values(state.sites)
+      ? getSortedSites()
       : [state.sites[state.selectedSite]];
 
     const traces = sitesToPlot.map(site => {
