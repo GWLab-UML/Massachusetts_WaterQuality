@@ -87,11 +87,11 @@
     .pill.active { background: var(--text); color: #fff; border-color: var(--text); }
     .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-    .explore-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.5rem; align-items: stretch; }
-    #map { height: 450px; border-radius: 12px; border: 1px solid var(--border); z-index: 1; }
+    .explore-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.5rem; align-items: stretch; height: 100%; }
+    #map { height: 100%; min-height: 450px; border-radius: 12px; border: 1px solid var(--border); z-index: 1; }
     .site-panel {
       border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
-      display: flex; flex-direction: column; justify-content: space-between; background: #fff;
+      display: flex; flex-direction: column; justify-content: space-between; background: #fff; height: 100%;
     }
     .site-card-item {
       border: 1px solid var(--border); border-radius: 10px; padding: 0.95rem 1.1rem;
@@ -190,7 +190,7 @@
 
       <div class="funding-note">
         <img src="dmf_logo.png" alt="Massachusetts Division of Marine Fisheries Logo" class="funding-logo" onerror="this.style.display='none'" />
-        <div>HOBO loggers were deployed and maintained in collaboration with the Massachusetts Department of Marine Fisheries.</div>
+        <div>HOBO loggers were deployed and maintained in collaboration with the Massachusetts Division of Marine Fisheries.</div>
       </div>
     </div>
   </header>
@@ -284,7 +284,7 @@
     { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", match: h => h.includes("Salinity-Adjusted DO") },
     { key: "do_meas", label: "Measured DO", unit: "mg/L", match: h => h.includes("Measured DO") },
     { key: "ph", label: "pH", unit: "pH units", match: h => /^pH\b/i.test(h) },
-    { key: "level", label: "Water Level", unit: "m (Compensated)", match: h => h.toLowerCase().includes("absolute pressure") || h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
+    { key: "level", label: "Water Level", unit: "ft (Compensated Depth)", match: h => h.toLowerCase().includes("absolute pressure") || h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
   ];
 
   let state = {
@@ -527,8 +527,14 @@
               if (key === "temp") {
                 entry[key] = cToF(r[rawCol]);
               } else if (key === "level") {
-                const bp = state.barometricData.get(tKey);
-                entry[key] = bp != null ? Math.max(0, r[rawCol] - bp) : r[rawCol];
+                let val = r[rawCol];
+                if (val > 50) {
+                  let bp = state.barometricData.get(tKey);
+                  if (bp == null) bp = 101.3;
+                  const kpaDiff = Math.max(0, val - bp);
+                  val = (kpaDiff / 9.80665) * 3.28084;
+                }
+                entry[key] = val;
               } else {
                 entry[key] = r[rawCol];
               }
@@ -594,6 +600,9 @@
     updateMapPins();
     updateChartPeriodDropdown();
     renderChart();
+    if (state.map) {
+      setTimeout(() => state.map.invalidateSize(), 100);
+    }
   }
 
   function renderKPIs() {
