@@ -40,6 +40,26 @@
     }
     .hero-image-box img { width: 100%; height: 100%; object-fit: cover; }
 
+    .funding-note {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .funding-logo {
+      height: 42px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
     .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 2rem; }
     .kpi-box { border-top: 2px solid var(--text); padding-top: 0.75rem; }
     .kpi-num { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
@@ -160,7 +180,12 @@
 
     <div>
       <div class="hero-image-box">
-        <img src="site_photo.jpg" alt="Field Deployment" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\'color:var(--muted); font-size:0.9rem;\'>Upload site_photo.jpg to repo</span>';" />
+        <img src="site_photo.png" alt="Field Deployment" onerror="if(!this.dataset.triedJpg){this.dataset.triedJpg='1'; this.src='site_photo.jpg';} else {this.style.display='none'; this.parentElement.innerHTML='<span style=\'color:var(--muted); font-size:0.9rem;\'>Upload site_photo.png to repo</span>';}" />
+      </div>
+
+      <div class="funding-note">
+        <img src="funding_logo.png" alt="Massachusetts Department of Fish and Game Logo" class="funding-logo" onerror="this.style.display='none'" />
+        <div>These HOBOs were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
       </div>
     </div>
   </header>
@@ -224,13 +249,14 @@
     </div>
   </section>
 
-<footer class="site-footer">
+  <footer class="site-footer">
     <div>
       For more information or questions, please email <a href="mailto:sarah_gignouxwolfsohn@uml.edu">Dr. Sarah Gignoux-Wolfsohn</a>.<br />
       Built by Julia G. McDonough in collaboration with Gemini.
     </div>
     <div>Raw data repository and logger information: <a href="https://github.com/GWLab-UML/Massachusetts_WaterQuality" target="_blank">GitHub / Massachusetts_WaterQuality</a></div>
   </footer>
+</div>
 
 <script>
   const OWNER = "GWLab-UML";
