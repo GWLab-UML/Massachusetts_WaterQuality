@@ -45,7 +45,7 @@
       align-items: center;
       gap: 0.85rem;
       margin-top: 1rem;
-      padding: 0.75rem 1rem;
+      padding: 0.75rem 1.1rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -185,7 +185,12 @@
 
       <div class="funding-note">
         <img src="funding_logo.png" alt="Massachusetts Department of Fish and Game Logo" class="funding-logo" onerror="this.style.display='none'" />
-        <div>A subset of these HOBOs were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
+        <div>These HOBOs were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
+      </div>
+
+      <div class="funding-note">
+        <img src="dmf_logo.png" alt="Massachusetts Division of Marine Fisheries Logo" class="funding-logo" onerror="this.style.display='none'" />
+        <div>HOBO loggers were deployed and maintained in collaboration with the Massachusetts Department of Marine Fisheries.</div>
       </div>
     </div>
   </header>
@@ -279,11 +284,12 @@
     { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", match: h => h.includes("Salinity-Adjusted DO") },
     { key: "do_meas", label: "Measured DO", unit: "mg/L", match: h => h.includes("Measured DO") },
     { key: "ph", label: "pH", unit: "pH units", match: h => /^pH\b/i.test(h) },
-    { key: "level", label: "Water Level", unit: "m", match: h => h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
+    { key: "level", label: "Water Level", unit: "m (Compensated)", match: h => h.toLowerCase().includes("absolute pressure") || h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
   ];
 
   let state = {
     sites: {},
+    barometricData: new Map(),
     selectedSite: "ALL",
     selectedPeriod: "ALL",
     selectedChartPeriod: "ALL",
@@ -364,9 +370,41 @@
       if (!treeRes.ok) throw new Error(`GitHub API error (${treeRes.status})`);
       const treeData = await treeRes.json();
 
-      const csvPaths = treeData.tree
-        .filter(item => item.type === "blob" && item.path.endsWith(".csv") && !item.path.toLowerCase().includes("barometric"))
+      const allFiles = treeData.tree
+        .filter(item => item.type === "blob" && item.path.endsWith(".csv"))
         .map(item => item.path);
+
+      // 1. Identify and parse Barometric Pressure file first
+      const barometricPath = allFiles.find(p => p.toLowerCase().includes("barometric"));
+      if (barometricPath) {
+        const bpUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURI(barometricPath)}`;
+        const bpRows = await new Promise(resolve => {
+          Papa.parse(bpUrl, {
+            download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+            complete: res => resolve(res.data),
+            error: () => resolve([])
+          });
+        });
+
+        if (bpRows.length) {
+          const rawFields = Object.keys(bpRows[0]);
+          const dateCol = rawFields.find(f => f.toLowerCase().includes("date")) || rawFields[1];
+          const bpCol = rawFields.find(f => f.toLowerCase().includes("absolute pressure") || f.toLowerCase().includes("pressure"));
+
+          if (dateCol && bpCol) {
+            for (const r of bpRows) {
+              const dt = parseHoboDate(r[dateCol]);
+              const val = r[bpCol];
+              if (dt && !isNaN(dt.getTime()) && typeof val === "number") {
+                state.barometricData.set(dt.getTime(), val);
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Parse site CSVs
+      const csvPaths = allFiles.filter(p => !p.toLowerCase().includes("barometric"));
 
       let idx = 0;
       for (const path of csvPaths) {
@@ -486,7 +524,14 @@
 
           colMapping.forEach(({ rawCol, key }) => {
             if (typeof r[rawCol] === "number") {
-              entry[key] = (key === "temp") ? cToF(r[rawCol]) : r[rawCol];
+              if (key === "temp") {
+                entry[key] = cToF(r[rawCol]);
+              } else if (key === "level") {
+                const bp = state.barometricData.get(tKey);
+                entry[key] = bp != null ? Math.max(0, r[rawCol] - bp) : r[rawCol];
+              } else {
+                entry[key] = r[rawCol];
+              }
             }
           });
         }
