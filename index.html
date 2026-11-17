@@ -185,7 +185,7 @@
 
       <div class="funding-note">
         <img src="funding_logo.png" alt="Massachusetts Department of Fish and Game Logo" class="funding-logo" onerror="this.style.display='none'" />
-        <div>These HOBO water loggers were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
+        <div>These HOBOs were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
       </div>
     </div>
   </header>
@@ -267,9 +267,11 @@
   const SITE_COLORS = {
     "parkerriver": "#7B2FF7",
     "mudcreek": "#00C2FF",
-    "rowleyriver": "#FF2E63"
+    "rowleyriver": "#FF2E63",
+    "ipswichbluff": "#FF9F1C",
+    "eaglehill": "#10B981"
   };
-  const FALLBACK_PALETTE = ["#7B2FF7", "#00C2FF", "#FF2E63", "#4361EE", "#3A0CA3", "#F72585"];
+  const FALLBACK_PALETTE = ["#7B2FF7", "#00C2FF", "#FF2E63", "#FF9F1C", "#10B981", "#4361EE"];
 
   const METRIC_DEFS = [
     { key: "temp", label: "Water Temperature", unit: "°F", match: h => h.startsWith("Temperature") },
@@ -398,7 +400,7 @@
   }
 
   function initMap() {
-    state.map = L.map("map", { scrollWheelZoom: false }).setView([42.76, -70.85], 12);
+    state.map = L.map("map", { scrollWheelZoom: false }).setView([42.74, -70.83], 12);
     L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       maxZoom: 18
