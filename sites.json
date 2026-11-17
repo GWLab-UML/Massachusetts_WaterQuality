@@ -22,5 +22,21 @@
     "lat": 42.75112,
     "lng": -70.83723,
     "color": "#00C2FF"
+  },
+  "PlumIslandSound/IpswichBluff": {
+    "name": "Ipswich Bluff",
+    "shortCode": "IB",
+    "region": "Plum Island Sound",
+    "lat": 42.7108539, 
+    "lng": -70.7877422,
+    "color": "#FF9F1C"
+  },
+  "PlumIslandSound/EagleHill": {
+    "name": "Eagle Hill ",
+    "shortCode": "EH",
+    "region": "Plum Island Sound",
+    "lat": 42.7126087, 
+    "lng": -70.8151597,
+    "color": "#10B981"
   }
 }
