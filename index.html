@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Massachusetts Coastal Water Quality</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1180px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+    .header-branding { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.25rem; }
+    .lab-logo { height: 95px; width: auto; object-fit: contain; }
+
+    .hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2.5rem; align-items: start; margin-bottom: 3.5rem; }
+    .hero h1 { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 0; }
+    .hero p { font-size: 1.05rem; color: #334155; margin: 0 0 2rem; max-width: 60ch; }
+    
+    .hero-image-box {
+      width: 100%; height: 260px; border-radius: 12px; border: 1px solid var(--border);
+      overflow: hidden; background: var(--surface); display: flex; align-items: center; justify-content: center;
+    }
+    .hero-image-box img { width: 100%; height: 100%; object-fit: cover; }
+
+    .funding-note {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .funding-logo {
+      height: 42px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 2rem; }
+    .kpi-box { border-top: 2px solid var(--text); padding-top: 0.75rem; }
+    .kpi-num { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+    .kpi-label { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+    
+    .hero-aside { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.9rem; color: #475569; margin-top: 1.5rem; }
+    .hero-aside strong { color: var(--text); display: block; margin-bottom: 0.35rem; }
+    .filter-controls {
+      margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 0.55rem;
+    }
+    .filter-controls label {
+      display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 500; color: var(--text);
+    }
+    .filter-subrow {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+      margin-left: 1.5rem; font-size: 0.83rem; color: #334155;
+    }
+    .filter-subrow input[type="number"] {
+      width: 68px; padding: 0.2rem 0.4rem; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 0.83rem; font-weight: 600; color: var(--text); background: #fff;
+    }
+    .filter-status-note {
+      font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem;
+    }
+
+    section { margin-bottom: 4rem; }
+    .section-header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end;
+      gap: 1rem; padding-bottom: 1rem; border-bottom: 1.5px solid var(--text); margin-bottom: 1.5rem;
+    }
+    .section-header h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+    .section-header p { font-size: 0.92rem; color: var(--muted); margin: 0.2rem 0 0; }
+
+    .pill-group { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.42rem 0.9rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500;
+      border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pill:hover { border-color: #94a3b8; }
+    .pill.active { background: var(--text); color: #fff; border-color: var(--text); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+    .explore-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1.5rem; align-items: stretch; height: 100%; }
+    #map { height: 100%; min-height: 450px; border-radius: 12px; border: 1px solid var(--border); z-index: 1; }
+    .site-panel {
+      border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
+      display: flex; flex-direction: column; justify-content: space-between; background: #fff; height: 100%;
+    }
+    .site-card-item {
+      border: 1px solid var(--border); border-radius: 10px; padding: 0.95rem 1.1rem;
+      margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .site-card-item:hover { background: var(--surface); border-color: #94a3b8; }
+    .period-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.5rem 0.75rem; margin-top: 0.85rem;
+    }
+    .period-bar label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .period-bar select {
+      border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem;
+      font-size: 0.85rem; font-weight: 600; background: #fff; color: var(--text); cursor: pointer;
+    }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.1rem 0; }
+    .metric-item .m-label { font-size: 0.8rem; color: var(--muted); }
+    .metric-item .m-val { font-size: 1.35rem; font-weight: 700; }
+    .metric-item .m-unit { font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+
+    .logger-pin {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%; background: #fff;
+      border: 2.5px solid #7B2FF7; font-size: 11px; font-weight: 700; color: #0f172a;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .logger-pin.selected { color: #fff; transform: scale(1.15); }
+
+    .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+    .chart-box { border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; background: #fff; }
+    .chart-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+    .chart-header h3 { margin: 0; font-size: 1.15rem; }
+    .chart-header span { font-size: 0.85rem; color: var(--muted); }
+    .chart-outlier-banner {
+      font-size: 0.82rem; color: var(--muted); margin-bottom: 0.75rem;
+    }
+
+    .chart-filter-bar {
+      display: flex; align-items: center; gap: 0.75rem; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.75rem;
+    }
+    .chart-filter-bar label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .chart-filter-bar select {
+      border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem;
+      font-size: 0.85rem; font-weight: 600; background: #fff; color: var(--text); cursor: pointer;
+    }
+
+    .site-footer {
+      margin-top: 5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      font-size: 0.85rem; color: var(--muted); gap: 1rem;
+    }
+    .site-footer a { color: var(--text); text-decoration: underline; font-weight: 500; }
+
+    @media (max-width: 860px) {
+      .hero, .explore-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header class="hero">
+    <div>
+      <div class="header-branding">
+        <img src="lab_logo.png" alt="GW Lab Logo" class="lab-logo" />
+        <h1>Massachusetts Coastal Water Quality</h1>
+      </div>
+      <p>
+        Continuous high-frequency environmental monitoring in the Plum Island Sound on the north shore of Massachusetts.
+        We deploy submersible HOBO data loggers to track temperature, salinity, dissolved oxygen, pH, and tidal water levels on natural oyster beds
+        to understand estuarine dynamics.
+      </p>
+
+      <div class="hero-aside">
+        <strong>About the Sensor Network</strong>
+        Submersible HOBO conductivity, dissolved oxygen, pH, and water level loggers record measurements every 15 minutes.
+        Out-of-water deployment intervals are automatically filtered using logger water-detect flags.
+        <div class="filter-controls">
+          <label>
+            <input type="checkbox" id="filterOutWater" checked />
+            Exclude "Out of Water" readings
+          </label>
+          <label>
+            <input type="checkbox" id="filterOutliers" checked />
+            Remove sensor outliers (salinity &lt; 15 PSU, pH 6.5–8.5, &amp; monthly SD bounds)
+          </label>
+          <label>
+            <input type="checkbox" id="filterIpswichExtra" checked />
+            Extra Ipswich Bluff salinity threshold (keeps post-Sep 10 drift)
+          </label>
+          <div class="filter-subrow">
+            <span>Min Ipswich Bluff salinity (PSU):</span>
+            <input type="number" id="ipswichMinSal" value="20" min="0" max="42" step="0.5" />
+          </div>
+          <div class="filter-status-note" id="outlierSummaryNote"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="hero-image-box">
+        <img src="site_photo.png" alt="Field Deployment" onerror="if(!this.dataset.triedJpg){this.dataset.triedJpg='1'; this.src='site_photo.jpg';} else {this.style.display='none'; this.parentElement.innerHTML='<span style='color:var(--muted); font-size:0.9rem;'>Upload site_photo.png to repo</span>';}" />
+      </div>
+
+      <div class="funding-note">
+        <img src="funding_logo.png" alt="Massachusetts Department of Fish and Game Logo" class="funding-logo" onerror="this.style.display='none'" />
+        <div>A subset of these HOBO loggers were purchased with funding from the Massachusetts Department of Fish and Game's Community Biodiversity Grant Program.</div>
+      </div>
+
+      <div class="funding-note">
+        <img src="dmf_logo.png" alt="Massachusetts Division of Marine Fisheries Logo" class="funding-logo" onerror="this.style.display='none'" />
+        <div>HOBO loggers were deployed and maintained in collaboration with the Massachusetts Division of Marine Fisheries.</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-num" id="kpiSites">—</div>
+      <div class="kpi-label">logger sites</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-num" id="kpiReadings">—</div>
+      <div class="kpi-label">verified readings</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-num" id="kpiLatestDate">—</div>
+      <div class="kpi-label">latest logger offload</div>
+    </div>
+  </div>
+
+  <section style="margin-top: 3.5rem;">
+    <div class="section-header">
+      <div>
+        <h2>Explore the sites</h2>
+        <p>Select a site on the map or filter pills to inspect average conditions.</p>
+      </div>
+      <div class="pill-group" id="sitePills"></div>
+    </div>
+
+    <div class="explore-grid">
+      <div id="map"></div>
+      <div class="site-panel" id="sitePanel">
+        <div style="color:var(--muted);">Loading site metadata and logger CSVs...</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <div>
+        <h2>Water measurements over time</h2>
+        <p>Compare water quality metrics across selected sites and time windows.</p>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="pill-group" id="metricPills"></div>
+      <div class="chart-filter-bar">
+        <label for="chartPeriodSelect">Time window:</label>
+        <select id="chartPeriodSelect">
+          <option value="ALL">All data</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chart-box">
+      <div class="chart-header">
+        <h3 id="activeMetricTitle">Water Temperature</h3>
+        <span id="activeMetricUnit">Degrees Fahrenheit (°F)</span>
+      </div>
+      <div class="chart-outlier-banner" id="chartOutlierBanner"></div>
+      <div id="mainChart" style="height: 410px;"></div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div>
+      For more information or questions, please email <a href="mailto:sarah_gignouxwolfsohn@uml.edu">Dr. Sarah Gignoux-Wolfsohn</a>.<br />
+      Built by Julia G. McDonough in collaboration with Gemini.
+    </div>
+    <div>Raw data repository and logger information: <a href="https://github.com/GWLab-UML/Massachusetts_WaterQuality" target="_blank">GitHub / Massachusetts_WaterQuality</a></div>
+  </footer>
+</div>
+
+<script>
+  const OWNER = "GWLab-UML";
+  const REPO = "Massachusetts_WaterQuality";
+  const BRANCH = "main";
+  const CARTO_KEY = "cb1_5adm_1_adff386630b870a13660b8f1";
+
+  const SITE_COLORS = {
+    "parkerriver": "#7B2FF7",
+    "mudcreek": "#00C2FF",
+    "rowleyriver": "#FF2E63",
+    "ipswichbluff": "#FF9F1C",
+    "eaglehill": "#10B981"
+  };
+  const FALLBACK_PALETTE = ["#7B2FF7", "#00C2FF", "#FF2E63", "#FF9F1C", "#10B981", "#4361EE"];
+
+  const METRIC_DEFS = [
+    { key: "temp", label: "Water Temperature", unit: "°F", min: 25, max: 95, sdMult: 4.0, match: h => h.startsWith("Temperature") },
+    { key: "salinity", label: "Salinity", unit: "PSU", min: 15, max: 42, sdMult: 2.5, match: h => h.includes("Salinity (PSU)") },
+    { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", min: 0, max: 22, sdMult: 3.5, match: h => h.includes("Salinity-Adjusted DO") },
+    { key: "do_meas", label: "Measured DO", unit: "mg/L", min: 0, max: 22, sdMult: 3.5, match: h => h.includes("Measured DO") },
+    { key: "ph", label: "pH", unit: "pH units", min: 6.5, max: 8.5, sdMult: 2.0, match: h => /^pH\b/i.test(h) },
+    { key: "level", label: "Water Level", unit: "ft (Compensated Depth)", min: -1, max: 25, sdMult: 3.5, match: h => h.toLowerCase().includes("absolute pressure") || h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
+  ];
+
+  let state = {
+    sites: {},
+    barometricData: new Map(),
+    outlierCounts: {},
+    ipswichExtraCounts: {},
+    outOfWaterExcludedCount: 0,
+    selectedSite: "ALL",
+    selectedPeriod: "ALL",
+    selectedChartPeriod: "ALL",
+    selectedMetric: "temp",
+    map: null,
+    markers: {}
+  };
+
+  function isIpswichBluff(site) {
+    const k = (site.key || "").toLowerCase();
+    const n = (site.name || "").toLowerCase();
+    return k.includes("ipswichbluff") || k.includes("ipswich_bluff") || k.includes("ipswich bluff") || n.includes("ipswich bluff");
+  }
+
+  function cleanHeader(raw) {
+    return raw.replace(/\u00A0/g, " ").replace(/\s+/g, " ").replace(/\([A-Z0-9-]+\s+\d+\)/g, "").trim();
+  }
+
+  function parseHoboDate(str) {
+    if (!str) return null;
+    const tokens = String(str).trim().split(/\s+/);
+    const datePart = tokens[0];
+    const timePart = tokens[1] || "00:00:00";
+    const ampm = (tokens[2] || "").toUpperCase();
+
+    const [m, d, y] = datePart.split("/");
+    if (!y) return new Date(str);
+
+    const timeParts = timePart.split(":");
+    let hh = parseInt(timeParts[0] || "0", 10);
+    const mm = String(parseInt(timeParts[1] || "0", 10)).padStart(2, "0");
+    const ss = String(parseInt(timeParts[2] || "0", 10)).padStart(2, "0");
+
+    if (ampm === "AM") {
+      if (hh === 12) hh = 0;
+    } else if (ampm === "PM") {
+      if (hh < 12) hh += 12;
+    }
+
+    const hhStr = String(hh).padStart(2, "0");
+    return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${hhStr}:${mm}:${ss}`);
+  }
+
+  function cToF(c) {
+    if (c == null || isNaN(c)) return null;
+    return (c * 9/5) + 32;
+  }
+
+  function calcMean(records, key) {
+    let sum = 0, count = 0;
+    for (const r of records) {
+      const val = r[key];
+      if (typeof val === "number" && !isNaN(val)) {
+        sum += val;
+        count++;
+      }
+    }
+    return count > 0 ? sum / count : null;
+  }
+
+  function getYearMonth(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function applyMonthlyOutlierFilter(sitesObj) {
+    const counts = {};
+    METRIC_DEFS.forEach(m => counts[m.key] = 0);
+
+    for (const site of Object.values(sitesObj)) {
+      for (const mDef of METRIC_DEFS) {
+        const key = mDef.key;
+        const monthBuckets = new Map();
+
+        for (const r of site.records) {
+          const val = r[key];
+          if (typeof val !== "number" || isNaN(val)) continue;
+
+          if (val < mDef.min || val > mDef.max) {
+            r[key] = null;
+            counts[key]++;
+            continue;
+          }
+
+          const ym = getYearMonth(r.date);
+          if (!monthBuckets.has(ym)) monthBuckets.set(ym, []);
+          monthBuckets.get(ym).push(val);
+        }
+
+        const monthStats = new Map();
+        for (const [ym, vals] of monthBuckets.entries()) {
+          if (vals.length < 5) continue;
+          const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+          const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / vals.length;
+          const sd = Math.sqrt(variance);
+          monthStats.set(ym, { mean, sd });
+        }
+
+        for (const r of site.records) {
+          const val = r[key];
+          if (typeof val !== "number" || isNaN(val)) continue;
+
+          const stats = monthStats.get(getYearMonth(r.date));
+          if (stats && stats.sd > 0 && Math.abs(val - stats.mean) >= mDef.sdMult * stats.sd) {
+            r[key] = null;
+            counts[key]++;
+          }
+        }
+      }
+    }
+
+    state.outlierCounts = counts;
+  }
+
+  function applyIpswichExtraFilter(sitesObj) {
+    const extraCounts = {};
+    METRIC_DEFS.forEach(m => extraCounts[m.key] = 0);
+
+    const enabled = document.getElementById("filterIpswichExtra").checked;
+    if (!enabled) {
+      state.ipswichExtraCounts = extraCounts;
+      return;
+    }
+
+    const minSalInput = parseFloat(document.getElementById("ipswichMinSal").value);
+    const minSal = isNaN(minSalInput) ? 20 : minSalInput;
+
+    for (const site of Object.values(sitesObj)) {
+      if (!isIpswichBluff(site)) continue;
+
+      for (const r of site.records) {
+        const sal = r.salinity;
+        if (typeof sal === "number" && !isNaN(sal)) {
+          if (sal < minSal) {
+            r.salinity = null;
+            extraCounts.salinity++;
+          }
+        }
+      }
+    }
+
+    state.ipswichExtraCounts = extraCounts;
+  }
+
+  function getSortedSites() {
+    return Object.values(state.sites).sort((a, b) => b.lat - a.lat);
+  }
+
+  function getAvailableMonths(records) {
+    const map = new Map();
+    for (const r of records) {
+      const ym = getYearMonth(r.date);
+      if (!map.has(ym)) {
+        map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }
+
+  function getAllAvailableMonthsAcrossSites() {
+    const map = new Map();
+    getSortedSites().forEach(site => {
+      site.records.forEach(r => {
+        const ym = getYearMonth(r.date);
+        if (!map.has(ym)) {
+          map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+        }
+      });
+    });
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }
+
+  async function init() {
+    try {
+      let siteMeta = {};
+      try {
+        const metaRes = await fetch("./sites.json");
+        if (metaRes.ok) siteMeta = await metaRes.json();
+      } catch (_) {}
+
+      const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
+      if (!treeRes.ok) throw new Error(`GitHub API error (${treeRes.status})`);
+      const treeData = await treeRes.json();
+
+      const allFiles = treeData.tree
+        .filter(item => item.type === "blob" && item.path.endsWith(".csv"))
+        .map(item => item.path);
+
+      const barometricPath = allFiles.find(p => p.toLowerCase().includes("barometric"));
+      if (barometricPath) {
+        const bpUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURI(barometricPath)}`;
+        const bpRows = await new Promise(resolve => {
+          Papa.parse(bpUrl, {
+            download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+            complete: res => resolve(res.data),
+            error: () => resolve([])
+          });
+        });
+
+        if (bpRows.length) {
+          const rawFields = Object.keys(bpRows[0]);
+          const dateCol = rawFields.find(f => f.toLowerCase().includes("date")) || rawFields[1];
+          const bpCol = rawFields.find(f => f.toLowerCase().includes("absolute pressure") || f.toLowerCase().includes("pressure"));
+
+          if (dateCol && bpCol) {
+            for (const r of bpRows) {
+              const dt = parseHoboDate(r[dateCol]);
+              const val = r[bpCol];
+              if (dt && !isNaN(dt.getTime()) && typeof val === "number") {
+                state.barometricData.set(dt.getTime(), val);
+              }
+            }
+          }
+        }
+      }
+
+      const csvPaths = allFiles.filter(p => !p.toLowerCase().includes("barometric"));
+
+      let idx = 0;
+      for (const path of csvPaths) {
+        const parts = path.split("/");
+        if (parts.length < 3) continue;
+        const siteKey = `${parts[0]}/${parts[1]}`;
+        if (!state.sites[siteKey]) {
+          const meta = siteMeta[siteKey] || {};
+          const folderName = parts[1];
+          const lowerFolder = folderName.toLowerCase();
+          const assignedColor = meta.color || SITE_COLORS[lowerFolder] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length];
+
+          state.sites[siteKey] = {
+            key: siteKey,
+            name: meta.name || folderName.replace(/([A-Z])/g, " $1").trim(),
+            shortCode: meta.shortCode || folderName.slice(0, 2).toUpperCase(),
+            region: meta.region || parts[0].replace(/([A-Z])/g, " $1").trim(),
+            lat: meta.lat ?? (42.755 + idx * 0.02),
+            lng: meta.lng ?? (-70.858 - idx * 0.015),
+            color: assignedColor,
+            files: [],
+            records: []
+          };
+          idx++;
+        }
+        state.sites[siteKey].files.push(path);
+      }
+
+      initMap();
+      await loadAllCSVData();
+      setupControls();
+      renderAll();
+    } catch (err) {
+      document.getElementById("sitePanel").innerHTML =
+        `<div style="color:#b91c1c; font-weight:600;">Error: ${err.message}</div>`;
+      console.error(err);
+    }
+  }
+
+  function initMap() {
+    state.map = L.map("map", { scrollWheelZoom: false }).setView([42.74, -70.83], 12);
+    L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 18
+    }).addTo(state.map);
+
+    const bounds = [];
+    getSortedSites().forEach(site => {
+      bounds.push([site.lat, site.lng]);
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="logger-pin" id="pin-${site.key.replace('/', '-')}" style="border-color:${site.color}">${site.shortCode}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      const marker = L.marker([site.lat, site.lng], { icon }).addTo(state.map);
+      marker.on("click", () => {
+        state.selectedSite = (state.selectedSite === site.key) ? "ALL" : site.key;
+        state.selectedPeriod = "ALL";
+        renderAll();
+      });
+      state.markers[site.key] = marker;
+    });
+
+    if (bounds.length === 1) state.map.setView(bounds[0], 13);
+    else if (bounds.length > 1) state.map.fitBounds(bounds, { padding: [50, 50] });
+  }
+
+  async function loadAllCSVData() {
+    const excludeOut = document.getElementById("filterOutWater").checked;
+    const removeOutliers = document.getElementById("filterOutliers").checked;
+    let outExcluded = 0;
+
+    for (const site of Object.values(state.sites)) {
+      const timeMap = new Map();
+
+      for (const filePath of site.files) {
+        const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${encodeURI(filePath)}`;
+        const rows = await new Promise(resolve => {
+          Papa.parse(url, {
+            download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+            complete: res => resolve(res.data),
+            error: () => resolve([])
+          });
+        });
+
+        if (!rows.length) continue;
+        const rawFields = Object.keys(rows[0]);
+        const dateCol = rawFields.find(f => f.toLowerCase().includes("date")) || rawFields[1];
+        const waterDetectCol = rawFields.find(f => cleanHeader(f).toLowerCase() === "water detect");
+
+        const colMapping = [];
+        rawFields.forEach(rc => {
+          const clean = cleanHeader(rc);
+          const def = METRIC_DEFS.find(m => m.match(clean));
+          if (def && !colMapping.some(c => c.key === def.key)) {
+            colMapping.push({ rawCol: rc, key: def.key });
+          }
+        });
+
+        let currentlyOut = false;
+
+        for (const r of rows) {
+          if (waterDetectCol && r[waterDetectCol] != null) {
+            const flag = String(r[waterDetectCol]).trim().toLowerCase();
+            if (flag === "out" || flag === "out of water") currentlyOut = true;
+            else if (flag === "in" || flag === "in water" || flag === "submerged") currentlyOut = false;
+          }
+          if (excludeOut && currentlyOut) {
+            outExcluded++;
+            continue;
+          }
+
+          const dt = parseHoboDate(r[dateCol]);
+          if (!dt || isNaN(dt.getTime())) continue;
+
+          const tKey = dt.getTime();
+          if (!timeMap.has(tKey)) timeMap.set(tKey, { date: dt });
+          const entry = timeMap.get(tKey);
+
+          colMapping.forEach(({ rawCol, key }) => {
+            if (typeof r[rawCol] === "number") {
+              if (key === "temp") {
+                entry[key] = cToF(r[rawCol]);
+              } else if (key === "level") {
+                let val = r[rawCol];
+                if (val > 50) {
+                  let bp = state.barometricData.get(tKey);
+                  if (bp == null) bp = 101.3;
+                  const kpaDiff = Math.max(0, val - bp);
+                  val = (kpaDiff / 9.80665) * 3.28084;
+                }
+                entry[key] = val;
+              } else {
+                entry[key] = r[rawCol];
+              }
+            }
+          });
+        }
+      }
+
+      site.records = Array.from(timeMap.values()).sort((a, b) => a.date - b.date);
+    }
+
+    state.outOfWaterExcludedCount = outExcluded;
+
+    if (removeOutliers) {
+      applyMonthlyOutlierFilter(state.sites);
+    } else {
+      METRIC_DEFS.forEach(m => state.outlierCounts[m.key] = 0);
+    }
+
+    applyIpswichExtraFilter(state.sites);
+  }
+
+  function setupControls() {
+    const reloadAndRender = async () => {
+      await loadAllCSVData();
+      updateChartPeriodDropdown();
+      renderAll();
+    };
+
+    document.getElementById("filterOutWater").onchange = reloadAndRender;
+    document.getElementById("filterOutliers").onchange = reloadAndRender;
+    document.getElementById("filterIpswichExtra").onchange = reloadAndRender;
+    document.getElementById("ipswichMinSal").onchange = reloadAndRender;
+
+    updateChartPeriodDropdown();
+
+    const availableKeys = new Set();
+    getSortedSites().forEach(s => s.records.forEach(r => Object.keys(r).forEach(k => availableKeys.add(k))));
+    const availableMetrics = METRIC_DEFS.filter(m => availableKeys.has(m.key));
+    if (availableMetrics.length && !availableKeys.has(state.selectedMetric)) {
+      state.selectedMetric = availableMetrics[0].key;
+    }
+
+    const metricPills = document.getElementById("metricPills");
+    metricPills.innerHTML = availableMetrics.map(m =>
+      `<button class="pill ${m.key === state.selectedMetric ? "active" : ""}" data-metric="${m.key}">${m.label}</button>`
+    ).join("");
+
+    metricPills.querySelectorAll(".pill").forEach(btn => {
+      btn.onclick = () => {
+        metricPills.querySelectorAll(".pill").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.selectedMetric = btn.dataset.metric;
+        renderChart();
+      };
+    });
+  }
+
+  function updateChartPeriodDropdown() {
+    const select = document.getElementById("chartPeriodSelect");
+    const months = getAllAvailableMonthsAcrossSites();
+    
+    select.innerHTML = `
+      <option value="ALL" ${state.selectedChartPeriod === "ALL" ? "selected" : ""}>All data</option>
+      ${months.map(([ym, label]) => `<option value="${ym}" ${state.selectedChartPeriod === ym ? "selected" : ""}>${label}</option>`).join("")}
+    `;
+
+    select.onchange = (e) => {
+      state.selectedChartPeriod = e.target.value;
+      renderChart();
+    };
+  }
+
+  function renderAll() {
+    renderKPIs();
+    renderSitePills();
+    renderSitePanel();
+    updateMapPins();
+    updateChartPeriodDropdown();
+    renderChart();
+    if (state.map) {
+      setTimeout(() => state.map.invalidateSize(), 100);
+    }
+  }
+
+  function renderKPIs() {
+    const sites = getSortedSites();
+    const totalReadings = sites.reduce((sum, s) => sum + s.records.length, 0);
+    let latest = null;
+    sites.forEach(s => {
+      if (s.records.length) {
+        const d = s.records[s.records.length - 1].date;
+        if (!latest || d > latest) latest = d;
+      }
+    });
+
+    document.getElementById("kpiSites").textContent = sites.length;
+    document.getElementById("kpiReadings").textContent = totalReadings.toLocaleString();
+    document.getElementById("kpiLatestDate").textContent = latest
+      ? latest.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : "—";
+
+    const totalBaseRemoved = Object.values(state.outlierCounts).reduce((a, b) => a + b, 0);
+    const totalIpswichExtra = Object.values(state.ipswichExtraCounts).reduce((a, b) => a + b, 0);
+    const noteEl = document.getElementById("outlierSummaryNote");
+    const parts = [];
+    if (document.getElementById("filterOutWater").checked && state.outOfWaterExcludedCount > 0) {
+      parts.push(`${state.outOfWaterExcludedCount.toLocaleString()} "Out of Water" rows excluded`);
+    }
+    if (document.getElementById("filterOutliers").checked) {
+      parts.push(`${totalBaseRemoved.toLocaleString()} base sensor outliers removed`);
+    } else {
+      parts.push(`base outlier filter disabled`);
+    }
+    if (document.getElementById("filterIpswichExtra").checked && totalIpswichExtra > 0) {
+      parts.push(`${totalIpswichExtra.toLocaleString()} Ipswich Bluff readings below min PSU filtered`);
+    }
+    noteEl.textContent = parts.join(" · ") + ".";
+  }
+
+  function renderSitePills() {
+    const container = document.getElementById("sitePills");
+    const sites = getSortedSites();
+    let html = `<button class="pill ${state.selectedSite === "ALL" ? "active" : ""}" data-site="ALL">All sites</button>`;
+    sites.forEach(s => {
+      const active = state.selectedSite === s.key ? "active" : "";
+      html += `<button class="pill ${active}" data-site="${s.key}">
+        <span class="dot" style="background:${s.color}"></span>${s.name}
+      </button>`;
+    });
+    container.innerHTML = html;
+
+    container.querySelectorAll(".pill").forEach(btn => {
+      btn.onclick = () => {
+        state.selectedSite = btn.dataset.site;
+        state.selectedPeriod = "ALL";
+        renderAll();
+      };
+    });
+  }
+
+  function updateMapPins() {
+    getSortedSites().forEach(s => {
+      const el = document.getElementById(`pin-${s.key.replace("/", "-")}`);
+      if (!el) return;
+      if (state.selectedSite === s.key) {
+        el.classList.add("selected");
+        el.style.background = s.color;
+      } else {
+        el.classList.remove("selected");
+        el.style.background = "#fff";
+      }
+    });
+  }
+
+  function renderSitePanel() {
+    const panel = document.getElementById("sitePanel");
+    const sites = getSortedSites();
+
+    if (state.selectedSite === "ALL") {
+      const latestGlobal = sites.map(s => s.records.at(-1)?.date).filter(Boolean).sort((a, b) => b - a)[0];
+      const dateStr = latestGlobal ? latestGlobal.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
+
+      panel.innerHTML = `
+        <div>
+          <h3 style="margin:0 0 0.2rem;">All monitoring sites (North to South)</h3>
+          <div style="font-size:0.85rem; color:var(--muted); margin-bottom:1.1rem;">Overall averages · Data through ${dateStr}</div>
+          ${sites.map(s => {
+            const avgTemp = calcMean(s.records, "temp");
+            const avgSal = calcMean(s.records, "salinity");
+            const tempStr = avgTemp != null ? `${avgTemp.toFixed(1)}°` : "—";
+            const subStr = avgSal != null
+              ? `Avg salinity: ${avgSal.toFixed(1)} PSU · ${s.records.length.toLocaleString()} pts`
+              : `${s.files.length} datasets · ${s.records.length.toLocaleString()} pts`;
+
+            return `
+              <div class="site-card-item" style="border-left: 4px solid ${s.color}" onclick="state.selectedSite='${s.key}'; state.selectedPeriod='ALL'; renderAll();">
+                <div>
+                  <div style="font-weight:700;">${s.name}</div>
+                  <div style="font-size:0.83rem; color:var(--muted);">${subStr}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:1.35rem; font-weight:700;">${tempStr}</div>
+                  <div style="font-size:0.75rem; color:var(--muted);">avg water °F</div>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+        <div style="font-size:0.82rem; color:var(--muted);">Click any site card or map marker to view monthly & all-time averages.</div>
+      `;
+    } else {
+      const s = state.sites[state.selectedSite];
+      const months = getAvailableMonths(s.records);
+
+      if (state.selectedPeriod !== "ALL" && !months.some(([ym]) => ym === state.selectedPeriod)) {
+        state.selectedPeriod = "ALL";
+      }
+
+      const filteredRecords = state.selectedPeriod === "ALL"
+        ? s.records
+        : s.records.filter(r => getYearMonth(r.date) === state.selectedPeriod);
+
+      const fmtMean = (key, d = 1, roundInt = false) => {
+        const val = calcMean(filteredRecords, key);
+        if (val == null) return "—";
+        return roundInt ? Math.round(val).toLocaleString() : val.toFixed(d);
+      };
+
+      const monthOptions = [
+        `<option value="ALL" ${state.selectedPeriod === "ALL" ? "selected" : ""}>All Time (${s.records.length.toLocaleString()} pts)</option>`,
+        ...months.map(([ym, label]) =>
+          `<option value="${ym}" ${state.selectedPeriod === ym ? "selected" : ""}>${label}</option>`
+        )
+      ].join("");
+
+      panel.innerHTML = `
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span class="dot" style="background:${s.color}; width:10px; height:10px;"></span>
+              <h3 style="margin:0;">${s.name}</h3>
+            </div>
+            <a href="#" onclick="event.preventDefault(); state.selectedSite='ALL'; renderAll();" style="font-size:0.85rem; color:var(--text);">All sites</a>
+          </div>
+
+          <div class="period-bar">
+            <label for="periodSelect">Showing averages for:</label>
+            <select id="periodSelect">${monthOptions}</select>
+          </div>
+          <div style="font-size:0.8rem; color:var(--muted); margin-top:0.35rem;">
+            Based on ${filteredRecords.length.toLocaleString()} verified readings
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-item"><div class="m-label">Avg water temperature</div><div class="m-val">${fmtMean("temp", 1)} <span class="m-unit">°F</span></div></div>
+            <div class="metric-item"><div class="m-label">Avg salinity</div><div class="m-val">${fmtMean("salinity", 1)} <span class="m-unit">PSU</span></div></div>
+            <div class="metric-item"><div class="m-label">Avg dissolved oxygen</div><div class="m-val">${fmtMean("do_adj", 2)} <span class="m-unit">mg/L</span></div></div>
+            <div class="metric-item"><div class="m-label">Avg pH</div><div class="m-val">${fmtMean("ph", 2)}</div></div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("periodSelect").onchange = (e) => {
+        state.selectedPeriod = e.target.value;
+        renderSitePanel();
+      };
+    }
+  }
+
+  function renderChart() {
+    const metricDef = METRIC_DEFS.find(m => m.key === state.selectedMetric) || METRIC_DEFS[0];
+    document.getElementById("activeMetricTitle").textContent = metricDef.label;
+    document.getElementById("activeMetricUnit").textContent = metricDef.unit;
+
+    const banner = document.getElementById("chartOutlierBanner");
+    const baseRemoved = state.outlierCounts[metricDef.key] || 0;
+    const ipswichRemoved = state.ipswichExtraCounts[metricDef.key] || 0;
+    const msgParts = [];
+    if (document.getElementById("filterOutliers").checked && baseRemoved > 0) {
+      msgParts.push(`${baseRemoved.toLocaleString()} base outliers filtered`);
+    }
+    if (document.getElementById("filterIpswichExtra").checked && ipswichRemoved > 0) {
+      msgParts.push(`${ipswichRemoved.toLocaleString()} Ipswich Bluff readings (&lt; min PSU) filtered`);
+    }
+    banner.textContent = msgParts.length ? `${msgParts.join(" + ")} for ${metricDef.label.toLowerCase()}.` : "";
+
+    const sitesToPlot = state.selectedSite === "ALL"
+      ? getSortedSites()
+      : [state.sites[state.selectedSite]];
+
+    const traces = sitesToPlot.map(site => {
+      let pts = site.records.filter(r => r[metricDef.key] !== undefined);
+
+      if (state.selectedChartPeriod !== "ALL") {
+        pts = pts.filter(r => getYearMonth(r.date) === state.selectedChartPeriod);
+      }
+
+      const step = Math.max(1, Math.floor(pts.length / 4000));
+      const gapThresholdMs = Math.max(2 * 60 * 60 * 1000, step * 15 * 60 * 1000 * 3);
+
+      const xVals = [];
+      const yVals = [];
+
+      let prevDate = null;
+      for (let i = 0; i < pts.length; i += step) {
+        const r = pts[i];
+        const val = (typeof r[metricDef.key] === "number" && !isNaN(r[metricDef.key])) ? r[metricDef.key] : null;
+
+        if (prevDate && (r.date - prevDate) > gapThresholdMs) {
+          xVals.push(new Date(prevDate.getTime() + 15 * 60 * 1000));
+          yVals.push(null);
+        }
+
+        xVals.push(r.date);
+        yVals.push(val);
+        prevDate = r.date;
+      }
+
+      return {
+        x: xVals,
+        y: yVals,
+        name: site.name,
+        type: "scatter",
+        mode: "lines",
+        connectgaps: false,
+        line: { color: site.color, width: 2 }
+      };
+    });
+
+    Plotly.newPlot("mainChart", traces, {
+      margin: { t: 10, r: 25, b: 40, l: 55 },
+      xaxis: { showgrid: false, linecolor: "#cbd5e1" },
+      yaxis: { title: metricDef.unit, gridcolor: "#f1f5f9", zeroline: false },
+      hovermode: "x unified",
+      legend: { orientation: "h", y: 1.08 },
+      plot_bgcolor: "#ffffff",
+      paper_bgcolor: "#ffffff"
+    }, { responsive: true });
+  }
+
+  init();
+</script>
+</body>
+</html>
