@@ -67,6 +67,16 @@
     
     .hero-aside { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-size: 0.9rem; color: #475569; margin-top: 1.5rem; }
     .hero-aside strong { color: var(--text); display: block; margin-bottom: 0.35rem; }
+    .filter-controls {
+      margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .filter-controls label {
+      display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 500; color: var(--text);
+    }
+    .filter-status-note {
+      font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem;
+    }
 
     section { margin-bottom: 4rem; }
     .section-header {
@@ -127,6 +137,9 @@
     .chart-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
     .chart-header h3 { margin: 0; font-size: 1.15rem; }
     .chart-header span { font-size: 0.85rem; color: var(--muted); }
+    .chart-outlier-banner {
+      font-size: 0.82rem; color: var(--muted); margin-bottom: 0.75rem;
+    }
 
     .chart-filter-bar {
       display: flex; align-items: center; gap: 0.75rem; background: var(--surface);
@@ -169,11 +182,16 @@
         <strong>About the Sensor Network</strong>
         Submersible HOBO conductivity, dissolved oxygen, pH, and water level loggers record measurements every 15 minutes.
         Out-of-water deployment intervals are automatically filtered using logger water-detect flags.
-        <div style="margin-top:0.85rem; padding-top:0.75rem; border-top:1px solid var(--border);">
-          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-weight:500; color:var(--text);">
+        <div class="filter-controls">
+          <label>
             <input type="checkbox" id="filterOutWater" checked />
             Exclude "Out of Water" readings
           </label>
+          <label>
+            <input type="checkbox" id="filterOutliers" checked />
+            Remove sensor outliers (out-of-range &amp; &ge; 2 SD from monthly mean)
+          </label>
+          <div class="filter-status-note" id="outlierSummaryNote"></div>
         </div>
       </div>
     </div>
@@ -250,6 +268,7 @@
         <h3 id="activeMetricTitle">Water Temperature</h3>
         <span id="activeMetricUnit">Degrees Fahrenheit (°F)</span>
       </div>
+      <div class="chart-outlier-banner" id="chartOutlierBanner"></div>
       <div id="mainChart" style="height: 410px;"></div>
     </div>
   </section>
@@ -278,18 +297,20 @@
   };
   const FALLBACK_PALETTE = ["#7B2FF7", "#00C2FF", "#FF2E63", "#FF9F1C", "#10B981", "#4361EE"];
 
+  // Hard physical bounds prevent stuck/railed sensors (e.g. pH 16) from inflating the monthly SD
   const METRIC_DEFS = [
-    { key: "temp", label: "Water Temperature", unit: "°F", match: h => h.startsWith("Temperature") },
-    { key: "salinity", label: "Salinity", unit: "PSU", match: h => h.includes("Salinity (PSU)") },
-    { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", match: h => h.includes("Salinity-Adjusted DO") },
-    { key: "do_meas", label: "Measured DO", unit: "mg/L", match: h => h.includes("Measured DO") },
-    { key: "ph", label: "pH", unit: "pH units", match: h => /^pH\b/i.test(h) },
-    { key: "level", label: "Water Level", unit: "ft (Compensated Depth)", match: h => h.toLowerCase().includes("absolute pressure") || h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
+    { key: "temp", label: "Water Temperature", unit: "°F", min: 25, max: 95, match: h => h.startsWith("Temperature") },
+    { key: "salinity", label: "Salinity", unit: "PSU", min: 0, max: 42, match: h => h.includes("Salinity (PSU)") },
+    { key: "do_adj", label: "Salinity-Adjusted DO", unit: "mg/L", min: 0, max: 22, match: h => h.includes("Salinity-Adjusted DO") },
+    { key: "do_meas", label: "Measured DO", unit: "mg/L", min: 0, max: 22, match: h => h.includes("Measured DO") },
+    { key: "ph", label: "pH", unit: "pH units", min: 5.5, max: 9.5, match: h => /^pH\b/i.test(h) },
+    { key: "level", label: "Water Level", unit: "ft (Compensated Depth)", min: -1, max: 25, match: h => h.toLowerCase().includes("absolute pressure") || h.toLowerCase().includes("water level") || h.toLowerCase().includes("sensor depth") }
   ];
 
   let state = {
     sites: {},
     barometricData: new Map(),
+    outlierCounts: {}, // { metricKey: removedCount }
     selectedSite: "ALL",
     selectedPeriod: "ALL",
     selectedChartPeriod: "ALL",
@@ -330,6 +351,74 @@
     return count > 0 ? sum / count : null;
   }
 
+  function getYearMonth(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  /**
+   * Two-stage outlier filter per site & metric:
+   * 1. Remove physically impossible / railed sensor readings (e.g. pH > 9.5 or < 5.5)
+   *    so stuck blocks don't artificially inflate the monthly SD.
+   * 2. Group remaining readings by site + calendar month (YYYY-MM), compute mean & SD,
+   *    and null out any reading >= 2 SD from that month's mean.
+   */
+  function applyMonthlyOutlierFilter(sitesObj) {
+    const counts = {};
+    METRIC_DEFS.forEach(m => counts[m.key] = 0);
+
+    for (const site of Object.values(sitesObj)) {
+      for (const mDef of METRIC_DEFS) {
+        const key = mDef.key;
+
+        // Group valid physical values by YYYY-MM
+        const monthBuckets = new Map();
+        for (const r of site.records) {
+          const val = r[key];
+          if (typeof val !== "number" || isNaN(val)) continue;
+
+          if (val < mDef.min || val > mDef.max) {
+            r[key] = null;
+            counts[key]++;
+            continue;
+          }
+
+          const ym = getYearMonth(r.date);
+          if (!monthBuckets.has(ym)) monthBuckets.set(ym, []);
+          monthBuckets.get(ym).push(val);
+        }
+
+        // Compute monthly mean & SD
+        const monthStats = new Map();
+        for (const [ym, vals] of monthBuckets.entries()) {
+          if (vals.length < 5) continue;
+          const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+          const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / vals.length;
+          const sd = Math.sqrt(variance);
+          monthStats.set(ym, { mean, sd });
+        }
+
+        // Null out readings >= 2 SD from monthly mean
+        for (const r of site.records) {
+          const val = r[key];
+          if (typeof val !== "number" || isNaN(val)) continue;
+
+          const stats = monthStats.get(getYearMonth(r.date));
+          if (stats && stats.sd > 0 && Math.abs(val - stats.mean) >= 2 * stats.sd) {
+            r[key] = null;
+            counts[key]++;
+          }
+        }
+      }
+
+      // Drop timestamps where all metric values were nulled out
+      site.records = site.records.filter(r =>
+        METRIC_DEFS.some(m => typeof r[m.key] === "number" && !isNaN(r[m.key]))
+      );
+    }
+
+    state.outlierCounts = counts;
+  }
+
   function getSortedSites() {
     return Object.values(state.sites).sort((a, b) => b.lat - a.lat);
   }
@@ -337,7 +426,7 @@
   function getAvailableMonths(records) {
     const map = new Map();
     for (const r of records) {
-      const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
+      const ym = getYearMonth(r.date);
       if (!map.has(ym)) {
         map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
       }
@@ -349,7 +438,7 @@
     const map = new Map();
     getSortedSites().forEach(site => {
       site.records.forEach(r => {
-        const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
+        const ym = getYearMonth(r.date);
         if (!map.has(ym)) {
           map.set(ym, r.date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
         }
@@ -476,6 +565,7 @@
 
   async function loadAllCSVData() {
     const excludeOut = document.getElementById("filterOutWater").checked;
+    const removeOutliers = document.getElementById("filterOutliers").checked;
 
     for (const site of Object.values(state.sites)) {
       const timeMap = new Map();
@@ -545,14 +635,23 @@
 
       site.records = Array.from(timeMap.values()).sort((a, b) => a.date - b.date);
     }
+
+    if (removeOutliers) {
+      applyMonthlyOutlierFilter(state.sites);
+    } else {
+      METRIC_DEFS.forEach(m => state.outlierCounts[m.key] = 0);
+    }
   }
 
   function setupControls() {
-    document.getElementById("filterOutWater").onchange = async () => {
+    const reloadAndRender = async () => {
       await loadAllCSVData();
       updateChartPeriodDropdown();
       renderAll();
     };
+
+    document.getElementById("filterOutWater").onchange = reloadAndRender;
+    document.getElementById("filterOutliers").onchange = reloadAndRender;
 
     updateChartPeriodDropdown();
 
@@ -621,6 +720,14 @@
     document.getElementById("kpiLatestDate").textContent = latest
       ? latest.toLocaleDateString("en-US", { month: "short", day: "numeric" })
       : "—";
+
+    const totalRemoved = Object.values(state.outlierCounts).reduce((a, b) => a + b, 0);
+    const noteEl = document.getElementById("outlierSummaryNote");
+    if (document.getElementById("filterOutliers").checked) {
+      noteEl.textContent = `${totalRemoved.toLocaleString()} outlier measurements removed across all parameters.`;
+    } else {
+      noteEl.textContent = `Outlier filter disabled — showing all raw submerged readings.`;
+    }
   }
 
   function renderSitePills() {
@@ -703,10 +810,7 @@
 
       const filteredRecords = state.selectedPeriod === "ALL"
         ? s.records
-        : s.records.filter(r => {
-            const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
-            return ym === state.selectedPeriod;
-          });
+        : s.records.filter(r => getYearMonth(r.date) === state.selectedPeriod);
 
       const fmtMean = (key, d = 1, roundInt = false) => {
         const val = calcMean(filteredRecords, key);
@@ -760,6 +864,14 @@
     document.getElementById("activeMetricTitle").textContent = metricDef.label;
     document.getElementById("activeMetricUnit").textContent = metricDef.unit;
 
+    const banner = document.getElementById("chartOutlierBanner");
+    const removedForMetric = state.outlierCounts[metricDef.key] || 0;
+    if (document.getElementById("filterOutliers").checked && removedForMetric > 0) {
+      banner.textContent = `${removedForMetric.toLocaleString()} ${metricDef.label.toLowerCase()} readings outside valid sensor range or ≥ 2 SD from monthly mean removed (applied site-wide).`;
+    } else {
+      banner.textContent = "";
+    }
+
     const sitesToPlot = state.selectedSite === "ALL"
       ? getSortedSites()
       : [state.sites[state.selectedSite]];
@@ -768,21 +880,31 @@
       let pts = site.records.filter(r => r[metricDef.key] != null);
 
       if (state.selectedChartPeriod !== "ALL") {
-        pts = pts.filter(r => {
-          const ym = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}`;
-          return ym === state.selectedChartPeriod;
-        });
+        pts = pts.filter(r => getYearMonth(r.date) === state.selectedChartPeriod);
       }
 
       const step = Math.max(1, Math.floor(pts.length / 2500));
       const sampled = pts.filter((_, i) => i % step === 0);
 
+      // Insert nulls where time jumps > 2 hours so Plotly leaves clean gaps instead of bridging filtered periods
+      const xVals = [];
+      const yVals = [];
+      for (let i = 0; i < sampled.length; i++) {
+        if (i > 0 && (sampled[i].date - sampled[i - 1].date) > 2 * 60 * 60 * 1000) {
+          xVals.push(new Date(sampled[i - 1].date.getTime() + 15 * 60 * 1000));
+          yVals.push(null);
+        }
+        xVals.push(sampled[i].date);
+        yVals.push(sampled[i][metricDef.key]);
+      }
+
       return {
-        x: sampled.map(r => r.date),
-        y: sampled.map(r => r[metricDef.key]),
+        x: xVals,
+        y: yVals,
         name: site.name,
         type: "scatter",
         mode: "lines",
+        connectgaps: false,
         line: { color: site.color, width: 2 }
       };
     });
